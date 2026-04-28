@@ -4,6 +4,7 @@ import Link from "next/link";
 import * as React from "react";
 import { Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getSiteOriginClient } from "@/lib/site-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/app` },
+        options: { emailRedirectTo: `${getSiteOriginClient()}/auth/callback?next=/app` },
       });
       if (error) throw error;
 
@@ -53,7 +54,7 @@ export default function SignupPage() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/app` },
+        options: { redirectTo: `${getSiteOriginClient()}/auth/callback?next=/app` },
       });
       if (error) throw error;
     } catch (err: unknown) {

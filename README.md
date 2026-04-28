@@ -58,6 +58,8 @@ Build command: `npm run build`
 - `/` Landing
 - `/pricing` Pricing
 - `/signup` and `/login` Auth
+- `/reset-password` Password reset (via email link)
+- `/auth/callback` Supabase email/magic link callback
 - `/onboarding` 3-step onboarding
 - `/app` Dashboard
 - `/app/generator` AI generator (mock responses, ready for real API)

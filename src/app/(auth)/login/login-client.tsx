@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import * as React from "react";
 import { Globe } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getSiteOriginClient } from "@/lib/site-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,8 @@ export function LoginClient() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [sendingLink, setSendingLink] = React.useState(false);
+  const [sendingReset, setSendingReset] = React.useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +50,7 @@ export function LoginClient() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}${nextPath}` },
+        options: { redirectTo: `${getSiteOriginClient()}/auth/callback?next=${encodeURIComponent(nextPath)}` },
       });
       if (error) throw error;
     } catch (err: unknown) {
@@ -58,6 +61,59 @@ export function LoginClient() {
           "Activez Google OAuth dans Supabase Auth, puis reessayez.",
         variant: "destructive",
       });
+    }
+  }
+
+  async function sendMagicLink() {
+    if (!email) return;
+    setSendingLink(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${getSiteOriginClient()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+        },
+      });
+      if (error) throw error;
+
+      toast({
+        title: "Lien envoye",
+        description: "Verifiez votre email et ouvrez le lien pour vous connecter.",
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "Envoi impossible",
+        description: getErrorMessage(err) ?? "Impossible d'envoyer le lien magique.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingLink(false);
+    }
+  }
+
+  async function sendPasswordReset() {
+    if (!email) return;
+    setSendingReset(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${getSiteOriginClient()}/auth/callback?next=/reset-password`,
+      });
+      if (error) throw error;
+
+      toast({
+        title: "Email envoye",
+        description: "Ouvrez le lien dans votre email pour choisir un nouveau mot de passe.",
+      });
+    } catch (err: unknown) {
+      toast({
+        title: "Reset impossible",
+        description: getErrorMessage(err) ?? "Impossible d'envoyer l'email de reinitialisation.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingReset(false);
     }
   }
 
@@ -103,6 +159,20 @@ export function LoginClient() {
             {loading ? "Connexion..." : "Se connecter"}
           </Button>
         </form>
+        <div className="mt-3 grid gap-2">
+          <Button type="button" variant="outline" className="w-full" disabled={sendingLink || !email} onClick={sendMagicLink}>
+            {sendingLink ? "Envoi du lien..." : "Recevoir un lien de connexion"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-xs"
+            disabled={sendingReset || !email}
+            onClick={sendPasswordReset}
+          >
+            {sendingReset ? "Envoi..." : "Mot de passe oublie ? (reset)"}
+          </Button>
+        </div>
         <div className="mt-4 text-sm text-muted-foreground">
           Pas de compte ?{" "}
           <Link href="/signup" className="text-primary underline underline-offset-4">

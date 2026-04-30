@@ -1,28 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* Palette
+     Primary green: #16A34A
+     Dark navy: #0F172A
+     Soft background: #F8FAFC
+     Accent gold: #F59E0B
+     Text: #111827
+  */
+  --background: 210 40% 98%; /* #F8FAFC */
+  --foreground: 222 47% 11%; /* #111827 */
 
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 222 47% 11%;
 
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 160 100% 33%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 142 71% 45%;
 
-  --primary: 160 100% 33%;
+  --primary: 142 76% 36%; /* #16A34A */
   --primary-foreground: 0 0% 100%;
-  --accent: 40 100% 48%;
-  --accent-foreground: 222.2 84% 4.9%;
+  --accent: 38 92% 50%; /* #F59E0B */
+  --accent-foreground: 222 47% 11%;
 
-  --radius: 14px;
+  --radius: 16px;
 
-  --brand-green: #00a878;
-  --brand-gold: #f4a300;
+  --brand-green: #16a34a;
+  --brand-gold: #f59e0b;
+  --brand-navy: #0f172a;
 }
 
 @theme inline {
@@ -67,6 +75,22 @@ body {
   color: hsl(var(--foreground));
 }
 
+/* Subtle, premium interactions */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    scroll-behavior: smooth;
+  }
+}
+
 * {
   border-color: hsl(var(--border));
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }

@@ -8,7 +8,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-[var(--radius)] border bg-card text-card-foreground shadow-sm",
+        "rounded-[var(--radius)] border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md",
         className,
       )}
       {...props}
@@ -54,4 +54,3 @@ export function CardFooter({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("p-5 pt-0", className)} {...props} />;
 }
-

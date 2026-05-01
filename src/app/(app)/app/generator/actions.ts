@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { runChatCore, extractItems3FromCoreMessage } from "@/lib/ai/chat-core";
+import { consumeOneGenerationOrThrow } from "@/lib/quota/consume";
 
 const requestSchema = z.object({
   mode: z.enum(["reply", "followup", "closing", "complaint", "promo"]),
@@ -46,6 +47,37 @@ export async function generateMessages(raw: unknown): Promise<GeneratorResponse>
 
   const tz = req.userTimezone?.trim() || "Africa/Douala";
 
+  // Strong memory injection: if the user didn't provide business context,
+  // prepend the latest business profile summary (server-side).
+  try {
+    const supabase = await createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { data: p } = await supabase
+        .from("profiles")
+        .select("business_name,business_type,goal,country,city,offer,whatsapp")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+
+      const lines = [
+        typeof (p as any)?.business_name === "string" && (p as any).business_name ? `Business: ${(p as any).business_name}` : null,
+        typeof (p as any)?.business_type === "string" && (p as any).business_type ? `Sector: ${(p as any).business_type}` : null,
+        typeof (p as any)?.country === "string" && (p as any).country ? `Country: ${(p as any).country}` : null,
+        typeof (p as any)?.city === "string" && (p as any).city ? `City: ${(p as any).city}` : null,
+        typeof (p as any)?.offer === "string" && (p as any).offer ? `Offer: ${(p as any).offer}` : null,
+        typeof (p as any)?.goal === "string" && (p as any).goal ? `Goal: ${(p as any).goal}` : null,
+      ].filter(Boolean);
+
+      if (lines.length) {
+        // Attach to the user input so it influences all modes.
+        // (The core engine also injects business context, this is extra-safe for generator prompts.)
+        req.input = `Contexte business (à utiliser):\n${lines.join("\n")}\n\n${req.input}`;
+      }
+    }
+  } catch {
+    // ignore memory injection failures
+  }
+
   // We keep specialization in the user message, but the engine is unified.
   const extra =
     req.tone || req.length || req.formality
@@ -69,6 +101,17 @@ export async function generateMessages(raw: unknown): Promise<GeneratorResponse>
     req.input.trim(),
     extra,
   ].join("\n");
+
+  // Enforce quota (reserve 1 generation before calling the model).
+  try {
+    const supabase = await createClient();
+    const { data: user } = await supabase.auth.getUser();
+    if (user.user) {
+      await consumeOneGenerationOrThrow(user.user.id);
+    }
+  } catch (err: any) {
+    throw new Error(typeof err?.message === "string" ? err.message : "Quota atteint.");
+  }
 
   const core = await runChatCore({
     message: prompt,
@@ -171,4 +214,3 @@ export async function refineMessage(raw: unknown): Promise<{ item: string }> {
   if (!core.ok) throw new Error(core.error);
   return { item: core.data.message.trim() };
 }
-

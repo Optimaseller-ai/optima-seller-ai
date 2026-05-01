@@ -1,41 +1,16 @@
-import { z } from "zod";
 import { DateTime } from "luxon";
-import { serverEnv } from "@/lib/server-env";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { serverEnv } from "../server-env.ts";
+import { createClient as createSupabaseServerClient } from "../supabase/server.ts";
+import {
+  ALLOWED_MODELS,
+  CORE_MODES,
+  chatCoreRequestSchema,
+  type AllowedModel,
+  type CoreMode,
+} from "./chat-core.schema";
 
-const ALLOWED_MODELS = [
-  "openai/gpt-4o-mini",
-  "deepseek/deepseek-chat-v3",
-  "anthropic/claude-3.5-sonnet",
-  "perplexity/sonar",
-] as const;
-export type AllowedModel = (typeof ALLOWED_MODELS)[number];
-
-const CORE_MODES = [
-  "reply",
-  "followup",
-  "closing",
-  "complaint",
-  "promo",
-  "business_chat",
-] as const;
-export type CoreMode = (typeof CORE_MODES)[number];
-
-export const chatCoreRequestSchema = z.object({
-  message: z.string().min(1),
-  history: z
-    .array(
-      z.object({
-        role: z.enum(["system", "user", "assistant"]),
-        content: z.string(),
-      }),
-    )
-    .default([]),
-  mode: z.enum(CORE_MODES).optional(),
-  userTimezone: z.string().min(1).optional(),
-  model: z.enum(ALLOWED_MODELS).optional(),
-  responseFormat: z.enum(["single", "items_3"]).optional(),
-});
+export { chatCoreRequestSchema } from "./chat-core.schema";
 
 export type ChatCoreCapabilities = {
   realtime: boolean;
@@ -67,6 +42,10 @@ const SYSTEM_PROMPT = [
   "* Use user timezone, default Africa/Douala.",
   "* If user asks recent info, trends, prices, news: use web search.",
   "* Never hallucinate. If you are not sure, search or ask one useful clarifying question.",
+  "* Business memory rules:",
+  "  - When the user asks: 'Qui suis-je ?', 'Who am I?', 'Quel est mon business ?', 'What is my business?', or any question about their activity/offer/sector/city/goal, you MUST use the Business profile context if available.",
+  "  - If business profile context is missing or incomplete, say what is missing and ask the user to complete their profile (do NOT invent details).",
+  "  - Be specific: always mention business name + city + offer + sector + goal when available.",
 ].join("\n");
 
 function modeInstruction(mode: CoreMode) {
@@ -97,7 +76,7 @@ function modeInstruction(mode: CoreMode) {
         "MODE: Conclure vente",
         "When customer is interested and near purchase.",
         "Tone: confident, smooth, practical.",
-        "Goal: guide to payment/booking/confirmation and propose the next step clearly.",
+        "Goal: guide to confirmation/booking/delivery and propose the next step clearly.",
       ].join("\n");
     case "complaint":
       return [
@@ -128,7 +107,7 @@ function normalizeTimezone(raw: string | undefined) {
 }
 
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
-const profileCache = new Map<string, { expiresAt: number; context: string | null }>();
+const profileCache = new Map<string, { expiresAt: number; context: string | null; updatedAt: string | null }>();
 
 async function loadBusinessProfileContext() {
   try {
@@ -137,18 +116,22 @@ async function loadBusinessProfileContext() {
     if (!data.user) return null;
 
     const cached = profileCache.get(data.user.id);
-    if (cached && cached.expiresAt > Date.now()) return cached.context;
 
     const { data: profile } = await supabase
       .from("profiles")
       .select(
-        "full_name,business_name,business_type,city,country,whatsapp_number,main_goal,offer_description,brand_tone,response_style,language,first_name,shop_name",
+        "updated_at,full_name,business_name,business_type,goal,country,city,whatsapp,offer,email,first_name,shop_name,main_goal,whatsapp_number,offer_description,brand_tone,response_style,language",
       )
       .eq("id", data.user.id)
       .maybeSingle();
 
     if (!profile) return null;
     const record = profile as Record<string, unknown>;
+    const updatedAt = typeof record.updated_at === "string" ? record.updated_at : null;
+
+    if (cached && cached.expiresAt > Date.now() && cached.updatedAt && updatedAt && cached.updatedAt === updatedAt) {
+      return cached.context;
+    }
     const fullName =
       typeof record.full_name === "string"
         ? record.full_name
@@ -162,22 +145,41 @@ async function loadBusinessProfileContext() {
           ? record.shop_name
           : null;
 
+    const goal =
+      typeof record.goal === "string"
+        ? record.goal
+        : typeof record.main_goal === "string"
+          ? record.main_goal
+          : null;
+    const whatsapp =
+      typeof record.whatsapp === "string"
+        ? record.whatsapp
+        : typeof record.whatsapp_number === "string"
+          ? record.whatsapp_number
+          : null;
+    const offer =
+      typeof record.offer === "string"
+        ? record.offer
+        : typeof record.offer_description === "string"
+          ? record.offer_description
+          : null;
+
     const contextLines = [
       fullName ? `Owner name: ${fullName}` : null,
       businessName ? `Business name: ${businessName}` : null,
       typeof record.business_type === "string" && record.business_type ? `Business type: ${record.business_type}` : null,
       typeof record.country === "string" && record.country ? `Country: ${record.country}` : null,
       typeof record.city === "string" && record.city ? `City: ${record.city}` : null,
-      typeof record.whatsapp_number === "string" && record.whatsapp_number ? `Business WhatsApp: ${record.whatsapp_number}` : null,
-      typeof record.main_goal === "string" && record.main_goal ? `Main goal: ${record.main_goal}` : null,
+      whatsapp ? `Business WhatsApp: ${whatsapp}` : null,
+      goal ? `Main goal: ${goal}` : null,
       typeof record.brand_tone === "string" && record.brand_tone ? `Brand tone: ${record.brand_tone}` : null,
       typeof record.response_style === "string" && record.response_style ? `Response style: ${record.response_style}` : null,
       typeof record.language === "string" && record.language ? `Primary language: ${record.language}` : null,
-      typeof record.offer_description === "string" && record.offer_description ? `Offer/products: ${record.offer_description}` : null,
+      offer ? `Offer/products: ${offer}` : null,
     ].filter(Boolean);
 
     const context = contextLines.length ? contextLines.join("\n") : null;
-    profileCache.set(data.user.id, { context, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
+    profileCache.set(data.user.id, { context, updatedAt, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
     return context;
   } catch {
     return null;
@@ -398,4 +400,3 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
 export function extractItems3FromCoreMessage(coreMessage: string) {
   return splitToThreeItems(coreMessage);
 }
-

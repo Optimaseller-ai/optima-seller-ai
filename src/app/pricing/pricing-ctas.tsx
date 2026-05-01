@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
+import { DateTime } from "luxon";
 
 type Plan = "free" | "pro" | "business";
 type UserPlan = "free" | "pro";
@@ -25,8 +26,24 @@ export function PricingPrimaryCta({ plan }: { plan: Plan }) {
         if (canceled) return;
         setIsAuthed(Boolean(data.user));
 
-        // Billing is not wired yet; default to Free.
-        setUserPlan("free");
+        if (!data.user) {
+          setUserPlan("free");
+          return;
+        }
+
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("plan")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
+
+        if (canceled) return;
+
+        if (sub?.plan === "pro") {
+          setUserPlan("pro");
+        } else {
+          setUserPlan("free");
+        }
       } catch {
         if (canceled) return;
         setIsAuthed(false);
@@ -68,13 +85,10 @@ export function PricingPrimaryCta({ plan }: { plan: Plan }) {
         className={cn("w-full", active ? "pointer-events-none opacity-70" : undefined)}
         onClick={() => {
           if (active) return;
-          toast({
-            title: "Paiement bientôt",
-            description: "Mobile Money sera disponible prochainement.",
-          });
+          toast({ title: "Optima Pro", description: "Disponible bientôt." });
         }}
       >
-        {active ? <span>Plan actif</span> : <Link href="/pricing">Passer Pro</Link>}
+        {active ? <span>Plan actif</span> : <span>Disponible bientôt</span>}
       </Button>
     );
   }

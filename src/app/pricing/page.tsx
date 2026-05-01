@@ -59,18 +59,35 @@ export default function PricingPage() {
           />
 
           <PlanCard
-            name="PRO"
+            name="Optima Pro"
             price="3000"
             suffix="FCFA / mois"
-            description="Le meilleur plan pour vendre sérieusement."
+            description="Moins de 100 FCFA par jour"
             highlight
-            badge="Le plus choisi"
+            badge="Le plus rentable"
             features={[
-              "Quota élevé",
+              "Quota élevé IA",
+              "Réponses premium closing",
+              "Relance prospects intelligente",
               "Historique complet",
+              "Mémoire business avancée",
+              "Priorité vitesse IA",
               "Support prioritaire",
-              "Réponses plus rapides",
+              "Accès nouveautés",
             ]}
+            extra={
+              <div className="space-y-3">
+                <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-[rgba(15,23,42,0.02)] p-3 text-sm text-[var(--brand-navy)]/70">
+                  <span className="font-semibold text-[var(--brand-navy)]">
+                    1 vente gagnée peut rembourser l’abonnement
+                  </span>
+                </div>
+                <div className="rounded-[var(--radius)] border border-[var(--brand-gold)]/25 bg-[rgba(245,158,11,0.10)] p-3 text-sm text-[var(--brand-navy)]/80">
+                  Tarif fondateur limité aux 50 premiers utilisateurs
+                </div>
+                <div className="text-xs text-[var(--brand-navy)]/60">Annulable à tout moment</div>
+              </div>
+            }
             cta={
               <div className="grid gap-2">
                 <PricingPrimaryCta plan="pro" />
@@ -84,11 +101,13 @@ export default function PricingPage() {
             price="5000"
             suffix="FCFA / mois"
             description="Pour volume + équipe + priorité."
+            badge="Bientôt"
             features={[
-              "Très gros quota",
-              "Multi équipe",
-              "Support premium",
-              "Priorité nouveautés",
+              "Auto replies WhatsApp",
+              "CRM + pipeline",
+              "Relance prospects automatique",
+              "Tagging leads + segments",
+              "Horaires business + takeover",
             ]}
             cta={
               <PricingPrimaryCta plan="business" />
@@ -147,7 +166,7 @@ export default function PricingPage() {
             />
             <FaqCard
               q="Mobile Money arrive bientôt ?"
-              a="Oui. Nous finalisons l’intégration pour faciliter le paiement local."
+              a="Oui, c'est en préparation. Le paiement intégré arrive bientôt."
             />
             <FaqCard
               q="Puis-je changer de plan ?"
@@ -167,6 +186,7 @@ function PlanCard({
   description,
   features,
   cta,
+  extra,
   highlight,
   badge,
 }: {
@@ -176,6 +196,7 @@ function PlanCard({
   description: string;
   features: string[];
   cta: React.ReactNode;
+  extra?: React.ReactNode;
   highlight?: boolean;
   badge?: string;
 }) {
@@ -203,6 +224,8 @@ function PlanCard({
         <div className="text-3xl font-semibold tracking-tight text-[var(--brand-navy)]">
           {price} <span className="text-base font-medium text-[var(--brand-navy)]/55">{suffix}</span>
         </div>
+
+        {extra ? extra : null}
 
         <ul className="space-y-2 text-sm text-[var(--brand-navy)]/70">
           {features.map((f) => (

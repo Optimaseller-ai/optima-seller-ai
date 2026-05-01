@@ -122,8 +122,12 @@ export function SignupClient() {
               full_name: profile.full_name,
               business_name: profile.business_name,
               business_type: profile.business_type,
+              goal: profile.main_goal,
               country: profile.country,
               city: profile.city,
+              whatsapp: profile.whatsapp_number.trim() ? profile.whatsapp_number.trim() : null,
+              offer: null,
+              email: data.user.email ?? null,
               whatsapp_number: profile.whatsapp_number.trim() ? profile.whatsapp_number.trim() : null,
               main_goal: profile.main_goal,
               brand_tone: profile.brand_tone,
@@ -473,4 +477,3 @@ function getErrorMessage(err: unknown) {
   if (typeof err === "string") return err;
   return undefined;
 }
-

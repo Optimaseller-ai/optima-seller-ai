@@ -10,7 +10,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test -r ts-node/register tests"
+    "test": "node --test --test-isolation=none -r ts-node/register -r tsconfig-paths/register \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

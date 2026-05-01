@@ -1,6 +1,6 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { chatCoreRequestSchema } from "../src/lib/ai/chat-core";
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const { chatCoreRequestSchema } = require("../src/lib/ai/chat-core.schema");
 
 test("chat-core schema accepts assistant and generator modes", () => {
   const base = {
@@ -13,4 +13,3 @@ test("chat-core schema accepts assistant and generator modes", () => {
   assert.ok(chatCoreRequestSchema.safeParse({ ...base, mode: "business_chat", responseFormat: "single" }).success);
   assert.ok(chatCoreRequestSchema.safeParse({ ...base, mode: "reply", responseFormat: "items_3" }).success);
 });
-

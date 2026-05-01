@@ -22,6 +22,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
+import { useProfile } from "@/lib/data/use-profile";
+import { useQuota } from "@/lib/data/use-quota";
+import { MemoryBanner } from "@/components/app/memory-banner";
+import { computeMemoryStatus } from "@/lib/data/business-memory";
 
 type Model =
   | "openai/gpt-4o-mini"
@@ -132,6 +136,9 @@ async function postChatWithRetries(payload: {
 
 export function ChatClient() {
   const { toast } = useToast();
+  const profile = useProfile();
+  const quota = useQuota();
+  const mem = computeMemoryStatus(profile.profile);
 
   const [model, setModel] = React.useState<Model>("openai/gpt-4o-mini");
   const [mode, setMode] = React.useState<Mode>("reply");
@@ -174,6 +181,14 @@ export function ChatClient() {
     const trimmed = userText.trim();
     if (!trimmed) return;
     if (pending) return;
+    if (!quota.loading && quota.exhausted) {
+      toast({
+        title: "Quota atteint",
+        description: "Vous avez atteint votre quota mensuel. Disponible bientôt : upgrade Pro.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setPending(true);
     setLastUserInput(trimmed);
@@ -214,6 +229,7 @@ export function ChatClient() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      <MemoryBanner />
       {/* TOP HEADER */}
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-navy)]/10 bg-white px-3 py-1 text-xs font-medium text-[var(--brand-navy)]/75 shadow-sm">
@@ -380,10 +396,11 @@ export function ChatClient() {
               </div>
 
               <div className="grid gap-2 text-sm">
-                <InfoRow label="Entreprise" value="—" icon={Bot} />
-                <InfoRow label="Secteur" value="—" icon={Brain} />
-                <InfoRow label="Ville" value="—" icon={Globe} />
-                <InfoRow label="Ton" value="Professionnel chaleureux" icon={Sparkles} />
+                <InfoRow label="Entreprise" value={profile.profile?.business_name?.trim() || "—"} icon={Bot} />
+                <InfoRow label="Secteur" value={profile.profile?.business_type?.trim() || "—"} icon={Brain} />
+                <InfoRow label="Ville" value={profile.profile?.city?.trim() || "—"} icon={Globe} />
+                <InfoRow label="Offre" value={profile.profile?.offer?.trim() || "—"} icon={Sparkles} />
+                <InfoRow label="Objectif" value={profile.profile?.goal?.trim() || "—"} icon={TrendingUp} />
               </div>
 
               <div className="rounded-[var(--radius)] border border-[var(--brand-gold)]/30 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(22,163,74,0.10),rgba(255,255,255,0.55))] p-4">
@@ -392,10 +409,15 @@ export function ChatClient() {
                     <Crown className="size-5 text-[var(--brand-gold)]" />
                   </div>
                   <div className="space-y-1">
-                    <div className="text-sm font-semibold text-[var(--brand-navy)]">Conseil Optima</div>
+                    <div className="text-sm font-semibold text-[var(--brand-navy)]">Mémoire IA</div>
                     <div className="text-sm text-[var(--brand-navy)]/65">
-                      Plus votre contexte est précis, plus vos réponses convertissent.
+                      Statut: {mem.status === "active" ? "Active ✅" : "Incomplete ⚠️"} — plus votre contexte est précis, plus vos réponses convertissent.
                     </div>
+                    {profile.profile?.updated_at ? (
+                      <div className="text-xs text-[var(--brand-navy)]/60">
+                        Dernière synchro: {new Date(profile.profile.updated_at).toLocaleString("fr-FR")}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

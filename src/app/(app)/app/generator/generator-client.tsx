@@ -20,6 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toaster";
 import { generateMessages, refineMessage } from "@/app/(app)/app/generator/actions";
 import { cn } from "@/lib/utils";
+import { useQuota } from "@/lib/data/use-quota";
+import { MemoryBanner } from "@/components/app/memory-banner";
 
 type Tone = "pro" | "friendly" | "direct" | "luxury";
 type Mode = "reply" | "followup" | "closing" | "complaint" | "promo";
@@ -42,6 +44,7 @@ export function GeneratorClient() {
     }
   });
   const { toast } = useToast();
+  const quota = useQuota();
   const [pending, startTransition] = React.useTransition();
   const [capabilities, setCapabilities] = React.useState<
     null | { realtime: boolean; webSearch: boolean; businessMemory: boolean }
@@ -55,6 +58,14 @@ export function GeneratorClient() {
   async function run(nextMode: Mode = mode) {
     if (!input.trim()) {
       toast({ title: "Ajoutez un texte", description: "Remplissez le champ avant de generer." });
+      return;
+    }
+    if (!quota.loading && quota.exhausted) {
+      toast({
+        title: "Quota atteint",
+        description: "Vous avez atteint votre quota mensuel. Disponible bientôt : upgrade Pro.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -131,6 +142,7 @@ export function GeneratorClient() {
     <div className="space-y-6 sm:space-y-8">
       {/* TOP HEADER */}
       <div className="space-y-2">
+        <MemoryBanner compact />
         <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-navy)]/10 bg-white px-3 py-1 text-xs font-medium text-[var(--brand-navy)]/75 shadow-sm">
           <Sparkles className="size-3.5 text-[var(--brand-gold)]" />
           1 clic = 3 réponses professionnelles
@@ -149,6 +161,9 @@ export function GeneratorClient() {
                 Temps réel activé
               </div>
             ) : null}
+          </div>
+          <div className="inline-flex h-11 items-center rounded-full border border-[var(--brand-navy)]/10 bg-white px-4 text-sm font-medium text-[var(--brand-navy)]/75 shadow-sm">
+            {quota.loading ? "Quota…" : `Quota restant: ${quota.remaining} / ${quota.limit}`}
           </div>
         </div>
       </div>

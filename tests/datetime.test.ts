@@ -1,7 +1,7 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { DateTime } from "luxon";
-import { DEFAULT_TIMEZONE, parseNaturalLanguageDateTime } from "../src/lib/datetime";
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const { DateTime } = require("luxon");
+const { DEFAULT_TIMEZONE, parseNaturalLanguageDateTime } = require("../src/lib/datetime");
 
 const fixedNow = DateTime.fromISO("2026-04-27T15:00:00", { zone: DEFAULT_TIMEZONE });
 
@@ -44,4 +44,3 @@ test("lundi à 9h (when already past today)", () => {
   assert.equal(r.value.displayDate, "04/05/2026");
   assert.equal(r.value.displayTime, "09:00");
 });
-

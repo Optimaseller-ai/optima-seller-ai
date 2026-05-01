@@ -1,33 +1,60 @@
+"use client";
+
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  Bot,
-  CheckCircle2,
-  Clock,
-  MessageCircleMore,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Users,
-  Zap,
-} from "lucide-react";
+import * as React from "react";
+import { ArrowUpRight, Bot, CheckCircle2, Crown, MessageSquareReply, ShieldCheck, Sparkles, TrendingUp, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useProfile } from "@/lib/data/use-profile";
+import { useQuota } from "@/lib/data/use-quota";
+import { useRecentGenerations } from "@/lib/data/use-generations";
+import { createOptionalSupabaseClient } from "@/lib/data/supabase";
+import { MemoryBanner } from "@/components/app/memory-banner";
 
 export default function DashboardPage() {
-  const userName = "Yuri";
+  const profile = useProfile();
+  const quota = useQuota();
+  const recent = useRecentGenerations(6);
+  const [memberSince, setMemberSince] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const supabase = createOptionalSupabaseClient();
+        if (!supabase) return;
+        const { data } = await supabase.auth.getUser();
+        if (!data.user || cancelled) return;
+        setMemberSince(data.user.created_at ?? null);
+      } catch {
+        // ignore
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const userLabel =
+    profile.profile?.full_name?.trim() ||
+    profile.profile?.business_name?.trim() ||
+    "là";
+
+  const planLabel = quota.plan === "pro" ? "Pro" : "Free";
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      <MemoryBanner />
       {/* Top: welcome + KPIs */}
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)] sm:text-3xl">
-              Bonjour {userName} <span aria-hidden>👋</span>
+              Bonjour {userLabel}
             </h1>
             <p className="text-sm text-[var(--brand-navy)]/65 sm:text-base">
-              Voici votre activité du jour.
+              Votre plateforme est connectée à Supabase : données, quota et historique.
             </p>
           </div>
 
@@ -35,7 +62,7 @@ export default function DashboardPage() {
             <Button asChild variant="outline" className="bg-white">
               <Link href="/pricing">Voir Pro</Link>
             </Button>
-            <Button asChild className="shadow-sm">
+            <Button asChild className="shadow-sm" disabled={quota.exhausted}>
               <Link href="/app/generator">
                 Nouvelle génération <ArrowUpRight className="ml-2 size-4" />
               </Link>
@@ -44,264 +71,73 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <KpiCard
-            title="Générations restantes"
-            value="8"
-            delta="+2"
-            deltaLabel="vs hier"
-            icon={Sparkles}
-          />
-          <KpiCard
-            title="Prospects suivis"
-            value="14"
-            delta="+4"
-            deltaLabel="cette semaine"
-            icon={Users}
-          />
-          <KpiCard
-            title="Messages créés ce mois"
-            value="32"
-            delta="+12%"
-            deltaLabel="vs dernier mois"
-            icon={TrendingUp}
-          />
+          <KpiCard title="Générations restantes" value={quota.loading ? "…" : String(quota.remaining)} delta={quota.loading ? "…" : `${quota.remaining}/${quota.limit}`} deltaLabel="ce mois" icon={Sparkles} />
+          <KpiCard title="Plan actuel" value={planLabel} delta={quota.expires_at ? "Expire" : "Actif"} deltaLabel={quota.expires_at ? new Date(quota.expires_at).toLocaleDateString("fr-FR") : "—"} icon={Crown} />
+          <KpiCard title="Générations utilisées" value={quota.loading ? "…" : String(quota.used)} delta="Sync" deltaLabel="temps réel" icon={TrendingUp} />
         </div>
       </section>
 
       {/* Main actions */}
       <section className="space-y-3">
-        <div className="flex items-end justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-[var(--brand-navy)] sm:text-xl">
-              Actions IA rapides
-            </h2>
-            <p className="text-sm text-[var(--brand-navy)]/65">
-              Des réponses qui rassurent, relances qui convertissent, et scripts qui closent.
-            </p>
-          </div>
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold text-[var(--brand-navy)] sm:text-xl">Actions IA rapides</h2>
+          <p className="text-sm text-[var(--brand-navy)]/65">
+            Réponses, relances et scripts — adaptés à votre business automatiquement.
+          </p>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <ActionCard
-            tone="primary"
-            title="Répondre client"
-            description="Réponse immédiate + question de qualification."
-            icon={MessageCircleMore}
-            href="/app/generator?tab=reply"
-          />
-          <ActionCard
-            tone="primary"
-            title="Relancer prospect"
-            description="Relance courte, persuasive, orientée prochaine action."
-            icon={Clock}
-            href="/app/generator?tab=followup"
-          />
-          <ActionCard
-            tone="primary"
-            title="Conclure vente"
-            description="Traitez les objections et finalisez la commande proprement."
-            icon={Zap}
-            href="/app/generator?tab=closing"
-          />
-          <ActionCard
-            tone="neutral"
-            title="Gérer plainte"
-            description="Message calme + solution + réassurance client."
-            icon={ShieldCheck}
-            href="/app/generator?tab=complaint"
-          />
-          <ActionCard
-            tone="neutral"
-            title="Message promo"
-            description="Promo WhatsApp courte, claire, avec CTA."
-            icon={Bot}
-            href="/app/generator?tab=promo"
-          />
+          <ActionCard tone="primary" title="Répondre client" description="Réponse immédiate + question de qualification." icon={Users} href="/app/generator?tab=reply" />
+          <ActionCard tone="primary" title="Auto Reply (semi-auto)" description="Collez le message du client. Réponse instantanée." icon={MessageSquareReply} href="/app/auto-reply" />
+          <ActionCard tone="primary" title="Relancer prospect" description="Relance courte, persuasive, orientée action." icon={Zap} href="/app/generator?tab=followup" />
+          <ActionCard tone="primary" title="Conclure vente" description="Traitez les objections et finalisez proprement." icon={Sparkles} href="/app/generator?tab=closing" />
+          <ActionCard tone="neutral" title="Gérer plainte" description="Message calme + solution + réassurance." icon={ShieldCheck} href="/app/generator?tab=complaint" />
+          <ActionCard tone="neutral" title="Message promo" description="Promo WhatsApp courte, claire, avec CTA." icon={Bot} href="/app/generator?tab=promo" />
         </div>
       </section>
 
       {/* History + usage + upgrade */}
       <section className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <TimelineCard />
+          <TimelineCard items={recent.items} loading={recent.loading} />
         </div>
         <div className="space-y-4">
-          <UsageCard used={2} total={10} />
+          <UsageCard used={quota.used} total={quota.limit} />
           <UpgradeCard />
+          <MemberCard businessName={profile.profile?.business_name ?? null} memberSince={memberSince} />
         </div>
       </section>
     </div>
   );
 }
 
-function KpiCard({
-  title,
-  value,
-  delta,
-  deltaLabel,
-  icon: Icon,
-}: {
-  title: string;
-  value: string;
-  delta: string;
-  deltaLabel: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
+function MemberCard({ businessName, memberSince }: { businessName: string | null; memberSince: string | null }) {
   return (
-    <div className="relative overflow-hidden rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:p-5">
-      <div className="pointer-events-none absolute inset-0 opacity-60 [background:radial-gradient(40rem_20rem_at_20%_10%,rgba(22,163,74,0.10),transparent_55%),radial-gradient(36rem_20rem_at_90%_60%,rgba(245,158,11,0.10),transparent_55%)]" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <div className="text-xs font-medium text-[var(--brand-navy)]/60">
-            {title}
-          </div>
-          <div className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)]">
-            {value}
-          </div>
-          <div className="inline-flex items-center gap-2 text-xs text-[var(--brand-navy)]/60">
-            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--brand-green)]/20 bg-[rgba(22,163,74,0.08)] px-2 py-0.5 font-medium text-[var(--brand-navy)]">
-              <TrendingUp className="size-3 text-[var(--brand-green)]" />
-              {delta}
-            </span>
-            <span>{deltaLabel}</span>
-          </div>
+    <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+      <div className="text-sm font-semibold text-[var(--brand-navy)]">Infos</div>
+      <div className="mt-3 space-y-2 text-sm text-[var(--brand-navy)]/70">
+        <div className="flex items-center justify-between gap-3">
+          <span>Business</span>
+          <span className="font-medium text-[var(--brand-navy)]">{businessName?.trim() || "—"}</span>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--brand-navy)]/10 bg-white shadow-sm">
-          <Icon className="size-5 text-[var(--brand-green)]" />
+        <div className="flex items-center justify-between gap-3">
+          <span>Membre depuis</span>
+          <span className="font-medium text-[var(--brand-navy)]">
+            {memberSince ? new Date(memberSince).toLocaleDateString("fr-FR") : "—"}
+          </span>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ActionCard({
-  tone,
-  title,
-  description,
-  icon: Icon,
-  href,
-}: {
-  tone: "primary" | "neutral";
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  href: string;
-}) {
-  const isPrimary = tone === "primary";
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "group relative overflow-hidden rounded-[var(--radius)] border bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.08)] transition-all duration-200 ease-out",
-        "hover:-translate-y-0.5 hover:shadow-[0_18px_50px_rgba(15,23,42,0.12)] motion-reduce:hover:translate-y-0",
-        isPrimary ? "border-[var(--brand-green)]/18" : "border-[var(--brand-navy)]/10",
-      )}
-    >
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100",
-          isPrimary
-            ? "[background:radial-gradient(42rem_24rem_at_10%_0%,rgba(22,163,74,0.14),transparent_55%),radial-gradient(40rem_26rem_at_100%_60%,rgba(245,158,11,0.12),transparent_55%)]"
-            : "[background:radial-gradient(42rem_24rem_at_10%_0%,rgba(15,23,42,0.06),transparent_55%),radial-gradient(40rem_26rem_at_100%_60%,rgba(245,158,11,0.10),transparent_55%)]",
-        )}
-      />
-      <div className="relative flex h-full flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--brand-navy)]/10 bg-white shadow-sm">
-            <Icon className={cn("size-5", isPrimary ? "text-[var(--brand-green)]" : "text-[var(--brand-navy)]")} />
-          </div>
-          <div className="inline-flex items-center gap-1 rounded-full border border-[var(--brand-navy)]/10 bg-white px-2 py-1 text-[10px] font-medium text-[var(--brand-navy)]/70">
-            IA
-            <ArrowUpRight className="size-3" />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <div className="text-base font-semibold text-[var(--brand-navy)]">
-            {title}
-          </div>
-          <div className="text-sm leading-relaxed text-[var(--brand-navy)]/65">
-            {description}
-          </div>
-        </div>
-
-        <div className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--brand-green)]">
-          Ouvrir
-          <ArrowUpRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 motion-reduce:transition-none" />
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function TimelineCard() {
-  return (
-    <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
-      <div className="flex items-start justify-between gap-3 border-b border-[var(--brand-navy)]/10 p-5">
-        <div className="space-y-1">
-          <div className="text-base font-semibold text-[var(--brand-navy)]">
-            Dernières générations
-          </div>
-          <div className="text-sm text-[var(--brand-navy)]/60">
-            Date, type et aperçu — pour retrouver vite ce qui a converti.
-          </div>
-        </div>
-        <Button asChild variant="outline" className="bg-white">
-          <Link href="/app/generator">Voir tout</Link>
-        </Button>
-      </div>
-
-      <div className="p-3 sm:p-5">
-        <ol className="space-y-3">
-          {RECENT.map((g) => (
-            <li
-              key={g.id}
-              className="group relative rounded-[calc(var(--radius)-6px)] border border-[var(--brand-navy)]/10 bg-[hsl(var(--background))] p-4 transition-colors hover:bg-white"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--brand-navy)]/10 bg-white px-2 py-0.5 text-xs font-medium text-[var(--brand-navy)]/80">
-                      <Sparkles className="size-3 text-[var(--brand-gold)]" />
-                      {g.type}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-xs text-[var(--brand-navy)]/55">
-                      <Clock className="size-3.5" />
-                      {g.date}
-                    </span>
-                  </div>
-                  <div className="text-sm text-[var(--brand-navy)]/75 line-clamp-2">
-                    {g.preview}
-                  </div>
-                </div>
-                <Link
-                  href={g.href}
-                  className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-[var(--brand-green)] hover:underline"
-                >
-                  Ouvrir <ArrowUpRight className="size-3.5" />
-                </Link>
-              </div>
-
-              <div className="pointer-events-none absolute left-0 top-0 h-full w-1 rounded-l-[calc(var(--radius)-6px)] bg-[var(--brand-green)]/0 transition-colors group-hover:bg-[var(--brand-green)]/40" />
-            </li>
-          ))}
-        </ol>
       </div>
     </div>
   );
 }
 
 function UsageCard({ used, total }: { used: number; total: number }) {
-  const pct = Math.min(100, Math.round((used / total) * 100));
+  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
   return (
     <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
       <div className="space-y-1">
-        <div className="text-base font-semibold text-[var(--brand-navy)]">
-          Quota mensuel utilisé
-        </div>
-        <div className="text-sm text-[var(--brand-navy)]/60">
-          Gardez un œil sur votre volume pour optimiser vos ventes.
-        </div>
+        <div className="text-base font-semibold text-[var(--brand-navy)]">Quota mensuel</div>
+        <div className="text-sm text-[var(--brand-navy)]/60">Suivi en temps réel.</div>
       </div>
 
       <div className="mt-4 space-y-2">
@@ -319,7 +155,7 @@ function UsageCard({ used, total }: { used: number; total: number }) {
         </div>
         <div className="inline-flex items-center gap-2 text-xs text-[var(--brand-navy)]/60">
           <CheckCircle2 className="size-4 text-[var(--brand-green)]" />
-          Vos données restent privées. Branchez Supabase pour l’historique réel.
+          {total > used ? "Quota disponible." : "Quota atteint pour ce mois."}
         </div>
       </div>
     </div>
@@ -341,34 +177,15 @@ function UpgradeCard() {
         </div>
 
         <div>
-          <div className="text-base font-semibold text-[var(--brand-navy)]">
-            Passez Pro
-          </div>
+          <div className="text-base font-semibold text-[var(--brand-navy)]">Upgrade Pro</div>
           <div className="mt-1 text-sm leading-relaxed text-[var(--brand-navy)]/70">
-            Passez Pro pour plus de générations, historique illimité et support prioritaire.
-          </div>
-        </div>
-
-        <div className="grid gap-2 text-xs text-[var(--brand-navy)]/70">
-          <div className="inline-flex items-center gap-2">
-            <Sparkles className="size-4 text-[var(--brand-green)]" />
-            Plus de générations / mois
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <Clock className="size-4 text-[var(--brand-green)]" />
-            Historique illimité
-          </div>
-          <div className="inline-flex items-center gap-2">
-            <ShieldCheck className="size-4 text-[var(--brand-green)]" />
-            Support prioritaire
+            Paiement intégré : disponible bientôt. En attendant, un admin peut vous activer manuellement dans Supabase.
           </div>
         </div>
 
         <div className="pt-1">
-          <Button asChild variant="gold" size="lg" className="w-full">
-            <Link href="/pricing">
-              Upgrade Pro <ArrowUpRight className="ml-2 size-4" />
-            </Link>
+          <Button size="lg" className="w-full pointer-events-none opacity-70">
+            Disponible bientôt <ArrowUpRight className="ml-2 size-4" />
           </Button>
         </div>
       </div>
@@ -376,29 +193,115 @@ function UpgradeCard() {
   );
 }
 
-const RECENT = [
-  {
-    id: "1",
-    type: "Réponse client",
-    date: "Aujourd’hui • 09:14",
-    preview:
-      "Bonjour 👋 Oui c’est disponible. Le prix est 18 000 FCFA et livraison 24–48h. Vous le souhaitez en S, M ou L ?",
-    href: "/app/generator?tab=reply",
-  },
-  {
-    id: "2",
-    type: "Relance prospect",
-    date: "Hier • 18:40",
-    preview:
-      "Bonjour ! Petite relance 😊 Vous préférez livraison aujourd’hui ou demain ? Je peux vous réserver le stock.",
-    href: "/app/generator?tab=followup",
-  },
-  {
-    id: "3",
-    type: "Closing",
-    date: "Il y a 3 jours",
-    preview:
-      "Je comprends. Pour vous rassurer, paiement à la livraison possible. On valide la commande ?",
-    href: "/app/generator?tab=closing",
-  },
-] as const;
+function TimelineCard({ items, loading }: { items: any[]; loading: boolean }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-base font-semibold text-[var(--brand-navy)]">Dernières générations</div>
+          <div className="mt-1 text-sm text-[var(--brand-navy)]/60">Historique réel (Supabase).</div>
+        </div>
+        <Button asChild variant="outline" className="bg-white">
+          <Link href="/app/generator">Générer</Link>
+        </Button>
+      </div>
+
+      <div className="mt-4">
+        {loading ? (
+          <div className="text-sm text-[var(--brand-navy)]/60">Chargement…</div>
+        ) : items.length === 0 ? (
+          <div className="text-sm text-[var(--brand-navy)]/60">Aucune génération pour le moment.</div>
+        ) : (
+          <ol className="space-y-2">
+            {items.map((g: any) => (
+              <li key={g.id} className="rounded-2xl border border-[var(--brand-navy)]/10 bg-[hsl(var(--background))] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-medium text-[var(--brand-navy)]/70">{String(g.mode ?? "generation")}</div>
+                  <div className="text-xs text-[var(--brand-navy)]/55">
+                    {g.created_at ? new Date(g.created_at).toLocaleString("fr-FR") : "—"}
+                  </div>
+                </div>
+                <div className="mt-2 line-clamp-2 text-sm text-[var(--brand-navy)]/75">{String(g.input ?? "")}</div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  delta,
+  deltaLabel,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  delta: string;
+  deltaLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-[var(--brand-navy)]/60">{title}</div>
+          <div className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)]">{value}</div>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--brand-navy)]/10 bg-[hsl(var(--background))] shadow-sm">
+          <Icon className="size-5 text-[var(--brand-green)]" />
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-xs text-[var(--brand-navy)]/60">
+        <span className="font-medium text-[var(--brand-navy)]/70">{delta}</span>
+        <span>{deltaLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+function ActionCard({
+  tone,
+  title,
+  description,
+  icon: Icon,
+  href,
+}: {
+  tone: "primary" | "neutral";
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group relative overflow-hidden rounded-[var(--radius)] border bg-white p-4 shadow-sm transition-all duration-200 ease-out",
+        "hover:-translate-y-0.5 hover:shadow-[0_16px_45px_rgba(15,23,42,0.10)] motion-reduce:hover:translate-y-0",
+        tone === "primary" ? "border-[var(--brand-green)]/18" : "border-[var(--brand-navy)]/10",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "flex h-10 w-10 items-center justify-center rounded-2xl border shadow-sm",
+            tone === "primary"
+              ? "border-[var(--brand-green)]/22 bg-[rgba(22,163,74,0.08)]"
+              : "border-[var(--brand-navy)]/10 bg-[hsl(var(--background))]",
+          )}
+        >
+          <Icon className={cn("size-5", tone === "primary" ? "text-[var(--brand-green)]" : "text-[var(--brand-navy)]")} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--brand-navy)]">{title}</div>
+          <div className="mt-0.5 text-xs leading-relaxed text-[var(--brand-navy)]/60">{description}</div>
+        </div>
+      </div>
+      <div className="pointer-events-none absolute left-0 top-0 h-full w-1 rounded-l-[calc(var(--radius)-6px)] bg-[var(--brand-green)]/0 transition-colors group-hover:bg-[var(--brand-green)]/40" />
+    </Link>
+  );
+}

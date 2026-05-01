@@ -13,9 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toaster";
+import { useSubscription, isSubscriptionActive } from "@/lib/data/use-subscription";
+import { createOptionalSupabaseClient } from "@/lib/data/supabase";
 
 type Plan = "free" | "pro";
 
@@ -29,38 +30,15 @@ export function UnifiedNavbar() {
   const pathname = usePathname();
   const { toast } = useToast();
 
-  const [userLoaded, setUserLoaded] = React.useState(false);
-  const [isAuthed, setIsAuthed] = React.useState(false);
-  const [plan, setPlan] = React.useState<Plan>("free");
-
-  React.useEffect(() => {
-    let canceled = false;
-    async function load() {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (canceled) return;
-        setIsAuthed(Boolean(data.user));
-
-        // Billing/subscriptions are not wired yet in this demo.
-        setPlan("free");
-      } catch {
-        if (canceled) return;
-        setIsAuthed(false);
-        setPlan("free");
-      } finally {
-        if (!canceled) setUserLoaded(true);
-      }
-    }
-    void load();
-    return () => {
-      canceled = true;
-    };
-  }, []);
+  const sub = useSubscription();
+  const userLoaded = !sub.loading;
+  const isAuthed = Boolean(sub.userId);
+  const plan: Plan = isSubscriptionActive(sub.subscription) && sub.subscription?.plan === "pro" ? "pro" : "free";
 
   async function signOut() {
     try {
-      const supabase = createClient();
+      const supabase = createOptionalSupabaseClient();
+      if (!supabase) throw new Error("Supabase non configuré.");
       await supabase.auth.signOut();
       window.location.href = "/";
     } catch {
@@ -225,4 +203,3 @@ export function UnifiedNavbar() {
     </header>
   );
 }
-

@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { z } from "zod";
-import { serverEnv } from "../server-env.ts";
-import { createClient as createSupabaseServerClient } from "../supabase/server.ts";
+import { serverEnv } from "../server-env";
+import { createClient as createSupabaseServerClient } from "../supabase/server";
 import {
   ALLOWED_MODELS,
   CORE_MODES,
@@ -9,6 +9,7 @@ import {
   type AllowedModel,
   type CoreMode,
 } from "./chat-core.schema";
+import { type BusinessProfile, formatWhoAmIResponse, isWhoAmIIntent } from "./whoami";
 
 export { chatCoreRequestSchema } from "./chat-core.schema";
 
@@ -107,13 +108,20 @@ function normalizeTimezone(raw: string | undefined) {
 }
 
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
-const profileCache = new Map<string, { expiresAt: number; context: string | null; updatedAt: string | null }>();
+const profileCache = new Map<
+  string,
+  { expiresAt: number; context: string | null; updatedAt: string | null; profile: BusinessProfile | null }
+>();
 
-async function loadBusinessProfileContext() {
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+async function loadBusinessProfileContext(): Promise<{ context: string | null; profile: BusinessProfile | null }> {
   try {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase.auth.getUser();
-    if (!data.user) return null;
+    if (!data.user) return { context: null, profile: null };
 
     const cached = profileCache.get(data.user.id);
 
@@ -125,64 +133,77 @@ async function loadBusinessProfileContext() {
       .eq("id", data.user.id)
       .maybeSingle();
 
-    if (!profile) return null;
+    if (!profile) return { context: null, profile: null };
     const record = profile as Record<string, unknown>;
     const updatedAt = typeof record.updated_at === "string" ? record.updated_at : null;
 
     if (cached && cached.expiresAt > Date.now() && cached.updatedAt && updatedAt && cached.updatedAt === updatedAt) {
-      return cached.context;
+      return { context: cached.context, profile: cached.profile };
     }
-    const fullName =
-      typeof record.full_name === "string"
-        ? record.full_name
-        : typeof record.first_name === "string"
-          ? record.first_name
-          : null;
-    const businessName =
-      typeof record.business_name === "string"
-        ? record.business_name
-        : typeof record.shop_name === "string"
-          ? record.shop_name
-          : null;
 
-    const goal =
-      typeof record.goal === "string"
-        ? record.goal
-        : typeof record.main_goal === "string"
-          ? record.main_goal
-          : null;
-    const whatsapp =
-      typeof record.whatsapp === "string"
-        ? record.whatsapp
-        : typeof record.whatsapp_number === "string"
-          ? record.whatsapp_number
-          : null;
-    const offer =
-      typeof record.offer === "string"
-        ? record.offer
-        : typeof record.offer_description === "string"
-          ? record.offer_description
-          : null;
+    const ownerName = isNonEmptyString(record.full_name)
+      ? record.full_name
+      : isNonEmptyString(record.first_name)
+        ? record.first_name
+        : null;
+
+    const businessName = isNonEmptyString(record.business_name)
+      ? record.business_name
+      : isNonEmptyString(record.shop_name)
+        ? record.shop_name
+        : null;
+
+    const mainGoal = isNonEmptyString(record.goal)
+      ? record.goal
+      : isNonEmptyString(record.main_goal)
+        ? record.main_goal
+        : null;
+
+    const whatsapp = isNonEmptyString(record.whatsapp)
+      ? record.whatsapp
+      : isNonEmptyString(record.whatsapp_number)
+        ? record.whatsapp_number
+        : null;
+
+    const offer = isNonEmptyString(record.offer)
+      ? record.offer
+      : isNonEmptyString(record.offer_description)
+        ? record.offer_description
+        : null;
+
+    const businessProfile: BusinessProfile = {
+      ownerName,
+      businessName,
+      businessType: isNonEmptyString(record.business_type) ? record.business_type : null,
+      country: isNonEmptyString(record.country) ? record.country : null,
+      city: isNonEmptyString(record.city) ? record.city : null,
+      whatsapp,
+      mainGoal,
+      brandTone: isNonEmptyString(record.brand_tone) ? record.brand_tone : null,
+      responseStyle: isNonEmptyString(record.response_style) ? record.response_style : null,
+      primaryLanguage: isNonEmptyString(record.language) ? record.language : null,
+      offer,
+    };
 
     const contextLines = [
-      fullName ? `Owner name: ${fullName}` : null,
+      ownerName ? `Owner name: ${ownerName}` : null,
       businessName ? `Business name: ${businessName}` : null,
-      typeof record.business_type === "string" && record.business_type ? `Business type: ${record.business_type}` : null,
-      typeof record.country === "string" && record.country ? `Country: ${record.country}` : null,
-      typeof record.city === "string" && record.city ? `City: ${record.city}` : null,
+      businessProfile.businessType ? `Business type: ${businessProfile.businessType}` : null,
+      businessProfile.country ? `Country: ${businessProfile.country}` : null,
+      businessProfile.city ? `City: ${businessProfile.city}` : null,
       whatsapp ? `Business WhatsApp: ${whatsapp}` : null,
-      goal ? `Main goal: ${goal}` : null,
-      typeof record.brand_tone === "string" && record.brand_tone ? `Brand tone: ${record.brand_tone}` : null,
-      typeof record.response_style === "string" && record.response_style ? `Response style: ${record.response_style}` : null,
-      typeof record.language === "string" && record.language ? `Primary language: ${record.language}` : null,
+      mainGoal ? `Main goal: ${mainGoal}` : null,
+      businessProfile.brandTone ? `Brand tone: ${businessProfile.brandTone}` : null,
+      businessProfile.responseStyle ? `Response style: ${businessProfile.responseStyle}` : null,
+      businessProfile.primaryLanguage ? `Primary language: ${businessProfile.primaryLanguage}` : null,
       offer ? `Offer/products: ${offer}` : null,
     ].filter(Boolean);
 
     const context = contextLines.length ? contextLines.join("\n") : null;
-    profileCache.set(data.user.id, { context, updatedAt, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
-    return context;
+    profileCache.set(data.user.id, { context, updatedAt, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS, profile: businessProfile });
+    return { context, profile: businessProfile };
   } catch {
-    return null;
+    return { context: null, profile: null };
   }
 }
 
@@ -322,7 +343,23 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
   const mode: CoreMode = parsed.data.mode ?? "reply";
   const sanitizedHistory = parsed.data.history.filter((m) => m.role === "user" || m.role === "assistant").slice(-8);
 
-  const businessProfile = await loadBusinessProfileContext();
+  const businessProfileData = await loadBusinessProfileContext();
+  const businessProfileContext = businessProfileData.context;
+  const businessProfile = businessProfileData.profile;
+
+  if (isWhoAmIIntent(parsed.data.message) && businessProfile) {
+    const capabilities: ChatCoreCapabilities = {
+      realtime: true,
+      webSearch: true,
+      businessMemory: true,
+      timezone: userTz,
+      currentDateTime: current,
+    };
+    return {
+      ok: true,
+      data: { id: null, model: "profile", message: formatWhoAmIResponse(businessProfile), capabilities },
+    };
+  }
 
   const wantsItems3 = parsed.data.responseFormat === "items_3";
   const formatInstructions = wantsItems3
@@ -348,8 +385,8 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
         "",
         `Current date/time: ${current}.`,
         `User timezone: ${userTz}.`,
-        businessProfile ? "" : null,
-        businessProfile ? `Business profile context:\n${businessProfile}` : null,
+        businessProfileContext ? "" : null,
+        businessProfileContext ? `Business profile context:\n${businessProfileContext}` : null,
         "",
         formatInstructions,
       ]
@@ -371,7 +408,7 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
     const capabilities: ChatCoreCapabilities = {
       realtime: true,
       webSearch: true,
-      businessMemory: Boolean(businessProfile),
+      businessMemory: Boolean(businessProfileContext),
       timezone: userTz,
       currentDateTime: current,
     };
@@ -384,7 +421,7 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
         const capabilities: ChatCoreCapabilities = {
           realtime: true,
           webSearch: true,
-          businessMemory: Boolean(businessProfile),
+          businessMemory: Boolean(businessProfileContext),
           timezone: userTz,
           currentDateTime: current,
         };

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { GenerationRow } from "@/lib/data/types";
-import { createOptionalSupabaseClient } from "@/lib/data/supabase";
+import { authGetUserCoalesced, createOptionalSupabaseClient } from "@/lib/data/supabase";
 
 export function useRecentGenerations(limit = 6) {
   const [loading, setLoading] = React.useState(true);
@@ -28,7 +28,7 @@ export function useRecentGenerations(limit = 6) {
     }
     setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await authGetUserCoalesced(supabase);
       if (!auth.user) {
         setItems([]);
         setUserId(null);

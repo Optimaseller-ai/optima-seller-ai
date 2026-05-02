@@ -39,11 +39,15 @@ export function MemoryBanner({ compact }: { compact?: boolean }) {
         <div className="flex items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2">
             <AlertTriangle className={cn("text-[var(--brand-gold)]", compact ? "size-4" : "size-5")} />
-            <span className="font-medium text-[var(--brand-navy)]">
-              Complétez votre profil business pour débloquer des réponses IA personnalisées.
-            </span>
+            <span className="font-medium text-[var(--brand-navy)]">Profil incomplet, IA limitée.</span>
           </div>
-          <Button asChild className={cn("bg-[var(--brand-navy)] text-white hover:bg-[var(--brand-navy)]/90", compact ? "h-8" : "h-9")}>
+          <Button
+            asChild
+            className={cn(
+              "bg-[var(--brand-navy)] text-white hover:bg-[var(--brand-navy)]/90",
+              compact ? "h-8" : "h-9",
+            )}
+          >
             <Link href="/app/profile">Compléter</Link>
           </Button>
         </div>
@@ -53,4 +57,3 @@ export function MemoryBanner({ compact }: { compact?: boolean }) {
 
   return null;
 }
-

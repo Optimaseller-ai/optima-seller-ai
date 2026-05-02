@@ -21,6 +21,11 @@ export type ChatCoreCapabilities = {
   currentDateTime: string;
 };
 
+export type MemoryDebugStatus =
+  | { status: "PROFILE_FOUND"; userId: string; fields: Record<string, boolean> }
+  | { status: "PROFILE_EMPTY"; reason: string }
+  | { status: "AUTH_MISSING" };
+
 export type ChatCoreResponse =
   | { ok: true; data: { id: string | null; model: string; message: string; capabilities: ChatCoreCapabilities } }
   | { ok: false; status: number; error: string };
@@ -107,39 +112,75 @@ function normalizeTimezone(raw: string | undefined) {
   }
 }
 
-const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
-const profileCache = new Map<
-  string,
-  { expiresAt: number; context: string | null; updatedAt: string | null; profile: BusinessProfile | null }
->();
+// NOTE: We intentionally avoid caching profile lookups. In production, stale profile context is worse
+// than an extra read on each AI request, because it makes the assistant behave like it "forgot" the business.
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-async function loadBusinessProfileContext(): Promise<{ context: string | null; profile: BusinessProfile | null }> {
+function buildProfileContext(profile: BusinessProfile, opts?: { memoryLevel?: "limited" | "advanced" }) {
+  const isAdvanced = opts?.memoryLevel === "advanced";
+
+  // Canonical memory block (must remain stable; referenced by QA).
+  // This is injected into the hidden system prompt before every generation.
+  const contextLines = [
+    profile.businessName ? `You are assistant for ${profile.businessName}` : null,
+    profile.businessType ? `Sector: ${profile.businessType}` : null,
+    profile.city ? `City: ${profile.city}` : null,
+    profile.country ? `Country: ${profile.country}` : null,
+    profile.offer ? `Offer: ${profile.offer}` : null,
+    profile.mainGoal ? `Goal: ${profile.mainGoal}` : null,
+    // Advanced memory extras
+    isAdvanced && profile.ownerName ? `Owner name: ${profile.ownerName}` : null,
+    isAdvanced && profile.whatsapp ? `Business WhatsApp: ${profile.whatsapp}` : null,
+    isAdvanced && profile.brandTone ? `Brand tone: ${profile.brandTone}` : null,
+    isAdvanced && profile.responseStyle ? `Response style: ${profile.responseStyle}` : null,
+    isAdvanced && profile.primaryLanguage ? `Primary language: ${profile.primaryLanguage}` : null,
+  ].filter(Boolean);
+
+  return contextLines.length ? contextLines.join("\n") : null;
+}
+
+async function loadBusinessProfileContext(opts?: {
+  memoryLevel?: "limited" | "advanced";
+}): Promise<{ context: string | null; profile: BusinessProfile | null }> {
   try {
     const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return { context: null, profile: null };
 
-    const cached = profileCache.get(data.user.id);
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    let user = userData.user ?? null;
 
-    const { data: profile } = await supabase
+    if (!user) {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      user = sessionData.session?.user ?? null;
+      if (!user) {
+        console.log("[AI][MEMORY] PROFILE_EMPTY auth_user=null", {
+          userErr: userErr?.message ?? null,
+          sessionErr: sessionErr?.message ?? null,
+        });
+        return { context: null, profile: null };
+      }
+    }
+
+    const { data: profile, error: dbErr } = await supabase
       .from("profiles")
       .select(
-        "updated_at,full_name,business_name,business_type,goal,country,city,whatsapp,offer,email,first_name,shop_name,main_goal,whatsapp_number,offer_description,brand_tone,response_style,language",
+        "updated_at,full_name,business_name,business_type,goal,country,city,whatsapp,offer,email,first_name,shop_name,main_goal,whatsapp_number,offer_description",
       )
-      .eq("id", data.user.id)
+      .eq("id", user.id)
       .maybeSingle();
 
-    if (!profile) return { context: null, profile: null };
-    const record = profile as Record<string, unknown>;
-    const updatedAt = typeof record.updated_at === "string" ? record.updated_at : null;
-
-    if (cached && cached.expiresAt > Date.now() && cached.updatedAt && updatedAt && cached.updatedAt === updatedAt) {
-      return { context: cached.context, profile: cached.profile };
+    if (dbErr) {
+      console.log("[AI][MEMORY] PROFILE_EMPTY db_error", { message: dbErr.message, code: (dbErr as any)?.code ?? null });
+      return { context: null, profile: null };
     }
+
+    if (!profile) {
+      console.log("[AI][MEMORY] PROFILE_EMPTY row_missing", { userId: user.id });
+      return { context: null, profile: null };
+    }
+    const record = profile as Record<string, unknown>;
 
     const ownerName = isNonEmptyString(record.full_name)
       ? record.full_name
@@ -179,30 +220,32 @@ async function loadBusinessProfileContext(): Promise<{ context: string | null; p
       city: isNonEmptyString(record.city) ? record.city : null,
       whatsapp,
       mainGoal,
-      brandTone: isNonEmptyString(record.brand_tone) ? record.brand_tone : null,
-      responseStyle: isNonEmptyString(record.response_style) ? record.response_style : null,
-      primaryLanguage: isNonEmptyString(record.language) ? record.language : null,
+      brandTone: null,
+      responseStyle: null,
+      primaryLanguage: null,
       offer,
     };
 
-    const contextLines = [
-      ownerName ? `Owner name: ${ownerName}` : null,
-      businessName ? `Business name: ${businessName}` : null,
-      businessProfile.businessType ? `Business type: ${businessProfile.businessType}` : null,
-      businessProfile.country ? `Country: ${businessProfile.country}` : null,
-      businessProfile.city ? `City: ${businessProfile.city}` : null,
-      whatsapp ? `Business WhatsApp: ${whatsapp}` : null,
-      mainGoal ? `Main goal: ${mainGoal}` : null,
-      businessProfile.brandTone ? `Brand tone: ${businessProfile.brandTone}` : null,
-      businessProfile.responseStyle ? `Response style: ${businessProfile.responseStyle}` : null,
-      businessProfile.primaryLanguage ? `Primary language: ${businessProfile.primaryLanguage}` : null,
-      offer ? `Offer/products: ${offer}` : null,
-    ].filter(Boolean);
+    const context = buildProfileContext(businessProfile, opts);
 
-    const context = contextLines.length ? contextLines.join("\n") : null;
-    profileCache.set(data.user.id, { context, updatedAt, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS, profile: businessProfile });
+    const isEmpty = !context;
+    console.log(isEmpty ? "[AI][MEMORY] PROFILE_EMPTY fields_empty" : "[AI][MEMORY] PROFILE_FOUND", {
+      userId: user.id,
+      hasContext: Boolean(context),
+      fields: {
+        ownerName: Boolean(ownerName),
+        businessName: Boolean(businessName),
+        businessType: Boolean(businessProfile.businessType),
+        country: Boolean(businessProfile.country),
+        city: Boolean(businessProfile.city),
+        offer: Boolean(offer),
+        goal: Boolean(mainGoal),
+      },
+    });
+
     return { context, profile: businessProfile };
   } catch {
+    console.log("[AI][MEMORY] PROFILE_EMPTY unexpected_error");
     return { context: null, profile: null };
   }
 }
@@ -329,6 +372,8 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
     return { ok: false, status: 400, error: "Invalid request body." };
   }
 
+  const plan = parsed.data.plan === "pro" ? "pro" : "free";
+
   const primaryModel: AllowedModel = parsed.data.model ?? "openai/gpt-4o-mini";
   const fallbackModels: AllowedModel[] = [
     "deepseek/deepseek-chat-v3",
@@ -341,9 +386,24 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
   const current = `${now.toFormat("yyyy-LL-dd HH:mm")} (${userTz})`;
 
   const mode: CoreMode = parsed.data.mode ?? "reply";
-  const sanitizedHistory = parsed.data.history.filter((m) => m.role === "user" || m.role === "assistant").slice(-8);
+  const historyMaxAgeMs = plan === "pro" ? Infinity : 3 * 24 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const sanitizedHistory = parsed.data.history
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .filter((m) => {
+      if (!m.ts) return plan === "pro";
+      const t = Date.parse(m.ts);
+      if (!Number.isFinite(t)) return plan === "pro";
+      return nowMs - t <= historyMaxAgeMs;
+    })
+    .slice(-8);
 
-  const businessProfileData = await loadBusinessProfileContext();
+  const memoryLevel = plan === "pro" ? "advanced" : "limited";
+  const businessProfileOverride = parsed.data.businessProfile ?? null;
+  const businessProfileData = businessProfileOverride
+    ? { profile: businessProfileOverride as BusinessProfile, context: buildProfileContext(businessProfileOverride as BusinessProfile, { memoryLevel }) }
+    : await loadBusinessProfileContext({ memoryLevel });
+
   const businessProfileContext = businessProfileData.context;
   const businessProfile = businessProfileData.profile;
 
@@ -396,6 +456,10 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
     ...sanitizedHistory,
     { role: "user", content: parsed.data.message },
   ];
+
+  console.log("[AI][MEMORY] PROMPT_CONTEXT_SENT", { hasBusinessContext: Boolean(businessProfileContext) });
+  // Required for end-to-end memory audits: log the exact hidden system prompt sent to the model.
+  console.log("[AI][PROMPT] SYSTEM_PROMPT", messages[0]?.content ?? "");
 
   async function callModel(model: AllowedModel) {
     const res = await openRouterChat({ model, messages, temperature: 0.4, timeoutMs: 25_000 });

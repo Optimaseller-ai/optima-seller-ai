@@ -46,12 +46,21 @@ alter table public.profiles add column if not exists updated_at timestamptz not 
 create table if not exists public.subscriptions (
   user_id uuid primary key references auth.users (id) on delete cascade,
   plan text not null default 'free', -- free|pro
-  quota_limit integer not null default 10,
+  subscription_status text, -- active|pending|canceled
+  quota_limit integer not null default 100,
   quota_used integer not null default 0,
   expires_at timestamptz,
+  pro_since timestamptz,
+  payment_provider text,
+  payment_reference text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.subscriptions add column if not exists subscription_status text;
+alter table public.subscriptions add column if not exists pro_since timestamptz;
+alter table public.subscriptions add column if not exists payment_provider text;
+alter table public.subscriptions add column if not exists payment_reference text;
 
 -- Generations history
 create table if not exists public.generations (

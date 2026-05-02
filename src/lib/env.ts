@@ -12,6 +12,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: optionalTrimmed.pipe(z.string().url().optional()),
 
   SUPABASE_SERVICE_ROLE_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
+
+  LEEKPAY_SECRET_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
+  LEEKPAY_PUBLIC_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
 });
 
 export const env = envSchema.parse({
@@ -20,4 +23,7 @@ export const env = envSchema.parse({
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
 
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+
+  LEEKPAY_SECRET_KEY: process.env.LEEKPAY_SECRET_KEY,
+  LEEKPAY_PUBLIC_KEY: process.env.LEEKPAY_PUBLIC_KEY,
 });

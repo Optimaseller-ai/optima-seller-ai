@@ -8,7 +8,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--brand-navy)]/95 text-white backdrop-blur supports-[backdrop-filter]:bg-[var(--brand-navy)]/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <Link href="/" className="focus-visible:outline-none">
-            <BrandLogo />
+            <BrandLogo size="desktop" className="text-white" />
           </Link>
           <div className="flex items-center gap-2">
             <Button
@@ -27,7 +27,7 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
       {children}
       <footer className="border-t border-white/10 bg-[var(--brand-navy)] text-white">
         <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-white/70 sm:px-6">
-          {new Date().getFullYear()} Optima Seller AI. Concu pour les marchands
+          {new Date().getFullYear()} Optima Seller AI. Conçu pour les marchands
           francophones d&apos;Afrique.
         </div>
       </footer>

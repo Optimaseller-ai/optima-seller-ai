@@ -25,6 +25,7 @@ export const chatCoreRequestSchema = z.object({
       z.object({
         role: z.enum(["system", "user", "assistant"]),
         content: z.string(),
+        ts: z.string().optional(),
       }),
     )
     .default([]),
@@ -32,5 +33,20 @@ export const chatCoreRequestSchema = z.object({
   userTimezone: z.string().min(1).optional(),
   model: z.enum(ALLOWED_MODELS).optional(),
   responseFormat: z.enum(["single", "items_3"]).optional(),
+  plan: z.enum(["free", "pro"]).optional(),
+  businessProfile: z
+    .object({
+      ownerName: z.string().nullable().optional(),
+      businessName: z.string().nullable().optional(),
+      businessType: z.string().nullable().optional(),
+      country: z.string().nullable().optional(),
+      city: z.string().nullable().optional(),
+      whatsapp: z.string().nullable().optional(),
+      mainGoal: z.string().nullable().optional(),
+      brandTone: z.string().nullable().optional(),
+      responseStyle: z.string().nullable().optional(),
+      primaryLanguage: z.string().nullable().optional(),
+      offer: z.string().nullable().optional(),
+    })
+    .optional(),
 });
-

@@ -3,11 +3,11 @@
 import * as React from "react";
 import { DateTime } from "luxon";
 import type { SubscriptionPlan, SubscriptionRow } from "@/lib/data/types";
-import { createOptionalSupabaseClient } from "@/lib/data/supabase";
+import { authGetUserCoalesced, createOptionalSupabaseClient } from "@/lib/data/supabase";
 
 const DEFAULTS: Record<SubscriptionPlan, { quota_limit: number }> = {
-  free: { quota_limit: 10 },
-  pro: { quota_limit: 500 },
+  free: { quota_limit: 100 },
+  pro: { quota_limit: 2000 },
 };
 
 export type UseSubscriptionState = {
@@ -26,6 +26,10 @@ function normalizeSub(row: Record<string, unknown>): SubscriptionRow {
     quota_limit: typeof row.quota_limit === "number" ? row.quota_limit : DEFAULTS[plan].quota_limit,
     quota_used: typeof row.quota_used === "number" ? row.quota_used : 0,
     expires_at: typeof row.expires_at === "string" ? row.expires_at : null,
+    subscription_status: typeof row.subscription_status === "string" ? row.subscription_status : null,
+    pro_since: typeof row.pro_since === "string" ? row.pro_since : null,
+    payment_provider: typeof row.payment_provider === "string" ? row.payment_provider : null,
+    payment_reference: typeof row.payment_reference === "string" ? row.payment_reference : null,
     created_at: typeof row.created_at === "string" ? row.created_at : new Date(0).toISOString(),
     updated_at: typeof row.updated_at === "string" ? row.updated_at : new Date(0).toISOString(),
   };
@@ -64,7 +68,7 @@ export function useSubscription(): UseSubscriptionState {
 
     setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await authGetUserCoalesced(supabase);
       if (!auth.user) {
         setUserId(null);
         setSubscription(null);
@@ -75,7 +79,7 @@ export function useSubscription(): UseSubscriptionState {
 
       const { data: row, error: dbErr } = await supabase
         .from("subscriptions")
-        .select("user_id,plan,quota_limit,quota_used,created_at,updated_at")
+        .select("user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at")
         .eq("user_id", auth.user.id)
         .maybeSingle();
 
@@ -95,7 +99,7 @@ export function useSubscription(): UseSubscriptionState {
         const { data: created, error: createErr } = await supabase
           .from("subscriptions")
           .upsert(payload, { onConflict: "user_id" })
-          .select("user_id,plan,quota_limit,quota_used,expires_at,created_at,updated_at")
+          .select("user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at")
           .maybeSingle();
         if (createErr) throw createErr;
         next = created ? normalizeSub(created as any) : null;
@@ -119,6 +123,15 @@ export function useSubscription(): UseSubscriptionState {
             .update({ quota_used: usedThisMonth, updated_at: new Date().toISOString() })
             .eq("user_id", auth.user.id);
         }
+      }
+
+      // Migrate legacy quotas to the new defaults automatically (best-effort).
+      if (next && next.quota_limit !== DEFAULTS[next.plan].quota_limit) {
+        next = { ...next, quota_limit: DEFAULTS[next.plan].quota_limit };
+        await supabase
+          .from("subscriptions")
+          .update({ quota_limit: DEFAULTS[next.plan].quota_limit, updated_at: new Date().toISOString() })
+          .eq("user_id", auth.user.id);
       }
 
       setSubscription(next);

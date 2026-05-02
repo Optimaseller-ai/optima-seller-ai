@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toaster";
 import { useSubscription, isSubscriptionActive } from "@/lib/data/use-subscription";
 import { createOptionalSupabaseClient } from "@/lib/data/supabase";
+import { useProfile } from "@/lib/data/use-profile";
+import { Badge } from "@/components/premium/Badge";
+import { UpgradeButton } from "@/components/premium/UpgradeButton";
 
 type Plan = "free" | "pro";
 
@@ -26,14 +29,28 @@ const CENTER_NAV = [
   { href: "/pricing", label: "Tarifs" },
 ] as const;
 
-export function UnifiedNavbar() {
+export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null } = {}) {
   const pathname = usePathname();
   const { toast } = useToast();
 
   const sub = useSubscription();
+  const profileState = useProfile();
   const userLoaded = !sub.loading;
-  const isAuthed = Boolean(sub.userId);
+  const effectiveUserId = sub.userId ?? initialUserId ?? null;
+  const isAuthed = Boolean(effectiveUserId);
   const plan: Plan = isSubscriptionActive(sub.subscription) && sub.subscription?.plan === "pro" ? "pro" : "free";
+
+  const showMemoryBadge = process.env.NODE_ENV !== "production";
+  const memoryLoaded =
+    !profileState.loading &&
+    Boolean(
+      profileState.profile?.business_name ||
+        profileState.profile?.business_type ||
+        profileState.profile?.country ||
+        profileState.profile?.city ||
+        profileState.profile?.offer ||
+        profileState.profile?.goal,
+    );
 
   async function signOut() {
     try {
@@ -44,7 +61,7 @@ export function UnifiedNavbar() {
     } catch {
       toast({
         title: "Déconnexion",
-        description: "Supabase non configuré. Redirection vers l'accueil.",
+        description: "Supabase non configuré. Redirection vers l’accueil.",
       });
       window.location.href = "/";
     }
@@ -57,20 +74,20 @@ export function UnifiedNavbar() {
   const proDisabled = plan === "pro";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--brand-navy)]/10 bg-white/75 shadow-[0_10px_30px_-25px_rgba(15,23,42,0.25)] backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-40 border-b border-[var(--brand-navy)]/10 bg-white/80 shadow-[0_12px_35px_-28px_rgba(15,23,42,0.30)] backdrop-blur supports-[backdrop-filter]:bg-white/65">
       <div className="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 sm:px-6">
-        {/* LEFT */}
         <Link
           href={isUser ? "/app" : "/"}
-          className="flex items-center gap-2 focus-visible:outline-none"
+          className="flex items-center gap-2 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.18)]"
         >
-          <BrandLogo className="text-[var(--brand-navy)]" />
-          <span className="hidden text-sm font-medium text-[var(--brand-navy)] sm:inline">
-            Optima Seller AI
+          <span className="hidden sm:inline">
+            <BrandLogo size="desktop" className="text-[var(--brand-navy)] drop-shadow-[0_10px_25px_rgba(15,23,42,0.08)]" />
+          </span>
+          <span className="sm:hidden">
+            <BrandLogo size="mobile" className="text-[var(--brand-navy)] drop-shadow-[0_10px_25px_rgba(15,23,42,0.08)]" />
           </span>
         </Link>
 
-        {/* CENTER MENU (desktop) */}
         <nav className="hidden items-center justify-center gap-2 md:flex">
           {CENTER_NAV.map((item) => {
             const active = pathname === item.href;
@@ -91,9 +108,18 @@ export function UnifiedNavbar() {
           })}
         </nav>
 
-        {/* RIGHT */}
         <div className="flex items-center justify-end gap-2">
-          {/* Desktop right */}
+          {showMemoryBadge && isUser ? (
+            <Badge
+              className="hidden md:inline-flex"
+              variant={memoryLoaded ? "success" : "gold"}
+              title={memoryLoaded ? "Mémoire business chargée" : "Aucune mémoire business détectée"}
+            >
+              <span className={cn("h-2 w-2 rounded-full", memoryLoaded ? "bg-emerald-500" : "bg-[var(--brand-gold)]")} />
+              Mémoire
+            </Badge>
+          ) : null}
+
           {isGuest ? (
             <>
               <Button asChild variant="ghost" className="hidden md:inline-flex">
@@ -107,18 +133,9 @@ export function UnifiedNavbar() {
 
           {isUser ? (
             <>
-              <Button
-                asChild
-                variant="gold"
-                className={cn(
-                  "hidden md:inline-flex h-11",
-                  proDisabled ? "pointer-events-none opacity-70" : undefined,
-                )}
-              >
-                <Link aria-disabled={proDisabled} href="/pricing">
-                  {proLabel}
-                </Link>
-              </Button>
+              <span className="hidden md:inline-flex">
+                {proDisabled ? <Badge variant="pro">PRO</Badge> : <UpgradeButton disabled={proDisabled} label={proLabel} />}
+              </span>
               <Button asChild variant="outline" className="hidden md:inline-flex h-11 bg-white">
                 <Link href="/app">Dashboard</Link>
               </Button>
@@ -146,7 +163,6 @@ export function UnifiedNavbar() {
             </>
           ) : null}
 
-          {/* Mobile menu icon */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -177,10 +193,7 @@ export function UnifiedNavbar() {
                   <DropdownMenuItem asChild>
                     <Link href="/app/profile">Profil</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    asChild
-                    className={cn(proDisabled ? "pointer-events-none opacity-70" : undefined)}
-                  >
+                  <DropdownMenuItem asChild className={cn(proDisabled ? "pointer-events-none opacity-70" : undefined)}>
                     <Link href="/pricing">{proLabel}</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

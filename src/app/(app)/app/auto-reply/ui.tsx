@@ -56,7 +56,7 @@ export function AutoReplyClient() {
       setLoading(true);
       const msg = [
         "Tu réponds comme un vendeur WhatsApp professionnel.",
-        "Objectif: répondre vite, rassurer, et avancer vers l’achat (1 question max à la fin).",
+        "Objectif : répondre vite, rassurer et avancer vers l’achat (1 question max à la fin).",
         "",
         `Message du client:\n${incoming.trim()}`,
       ].join("\n");
@@ -105,9 +105,13 @@ export function AutoReplyClient() {
     if (!reply.trim()) return;
     try {
       await navigator.clipboard.writeText(reply.trim());
-      toast({ title: "Copié", description: "Réponse copiée dans le presse‑papier." });
+      toast({ title: "Copié", description: "Réponse copiée dans le presse‑papiers." });
     } catch {
-      toast({ title: "Copie impossible", description: "Autorisez l’accès au presse‑papier.", variant: "destructive" });
+      toast({
+        title: "Copie impossible",
+        description: "Autorisez l’accès au presse‑papiers.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -145,7 +149,7 @@ export function AutoReplyClient() {
             <ArrowRight className="ml-2 size-4" />
           </Button>
           <div className="text-xs text-[var(--brand-navy)]/55">
-            Conseil: collez le message complet (prix, ville, questions).
+            Conseil : collez le message complet (prix, ville, questions).
           </div>
         </div>
       </div>
@@ -163,11 +167,23 @@ export function AutoReplyClient() {
           <Button size="lg" className="h-11" onClick={sendWhatsApp} disabled={!reply.trim()}>
             Envoyer sur WhatsApp
           </Button>
-          <Button size="lg" variant="outline" className="h-11 bg-white" onClick={() => void copy()} disabled={!reply.trim()}>
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-11 bg-white"
+            onClick={() => void copy()}
+            disabled={!reply.trim()}
+          >
             <Copy className="mr-2 size-4" />
             Copier
           </Button>
-          <Button size="lg" variant="outline" className="h-11 bg-white" onClick={remindLater} disabled={!reply.trim() || !incoming.trim()}>
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-11 bg-white"
+            onClick={remindLater}
+            disabled={!reply.trim() || !incoming.trim()}
+          >
             <Timer className="mr-2 size-4" />
             Relancer plus tard
           </Button>
@@ -184,7 +200,7 @@ export function AutoReplyClient() {
         </div>
 
         <div className="text-xs text-[var(--brand-navy)]/55">
-          Phase 2: réponses automatiques, relances différées, tagging prospects, horaires, reprise humaine.
+          Phase 2 : réponses automatiques, relances différées, tagging prospects, horaires, reprise humaine.
         </div>
       </div>
     </div>

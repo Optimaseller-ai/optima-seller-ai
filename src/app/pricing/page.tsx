@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Check, Sparkles, ArrowUpRight, HelpCircle } from "lucide-react";
-import { UnifiedNavbar } from "@/components/nav/unified-navbar";
+import { UnifiedNavbarServer } from "@/components/nav/unified-navbar-server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { PricingPrimaryCta, PricingTrialCta } from "@/app/pricing/pricing-ctas";
+import { PricingHeroCtas } from "@/app/pricing/pricing-hero-ctas";
 
 export default function PricingPage() {
   return (
@@ -14,10 +15,9 @@ export default function PricingPage() {
         <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(to_right,rgba(15,23,42,0.6)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.6)_1px,transparent_1px)] [background-size:40px_40px]" />
       </div>
 
-      <UnifiedNavbar />
+      <UnifiedNavbarServer />
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-        {/* HERO */}
         <section className="space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-navy)]/10 bg-white px-3 py-1 text-xs font-medium text-[var(--brand-navy)]/75 shadow-sm">
             <Sparkles className="size-3.5 text-[var(--brand-gold)]" />
@@ -32,30 +32,18 @@ export default function PricingPage() {
                 Commencez gratuitement. Passez Pro quand vous êtes prêt.
               </p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button asChild variant="outline" className="bg-white">
-                <Link href="/app">Voir le dashboard</Link>
-              </Button>
-              <Button asChild className="shadow-sm">
-                <Link href="/signup">
-                  Créer un compte <ArrowUpRight className="ml-2 size-4" />
-                </Link>
-              </Button>
-            </div>
+            <PricingHeroCtas />
           </div>
         </section>
 
-        {/* PRICING CARDS */}
         <section className="mt-8 grid gap-4 lg:mt-10 lg:grid-cols-3">
           <PlanCard
             name="FREE"
             price="0"
             suffix="FCFA / mois"
             description="Pour démarrer et tester Optima."
-            features={["10 générations / mois", "Outils IA complets", "Mini CRM pipeline"]}
-            cta={
-              <PricingPrimaryCta plan="free" />
-            }
+            features={["100 générations / mois", "Outils IA complets", "Mini CRM pipeline"]}
+            cta={<PricingPrimaryCta plan="free" />}
           />
 
           <PlanCard
@@ -78,9 +66,7 @@ export default function PricingPage() {
             extra={
               <div className="space-y-3">
                 <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-[rgba(15,23,42,0.02)] p-3 text-sm text-[var(--brand-navy)]/70">
-                  <span className="font-semibold text-[var(--brand-navy)]">
-                    1 vente gagnée peut rembourser l’abonnement
-                  </span>
+                  <span className="font-semibold text-[var(--brand-navy)]">1 vente gagnée peut rembourser l’abonnement</span>
                 </div>
                 <div className="rounded-[var(--radius)] border border-[var(--brand-gold)]/25 bg-[rgba(245,158,11,0.10)] p-3 text-sm text-[var(--brand-navy)]/80">
                   Tarif fondateur limité aux 50 premiers utilisateurs
@@ -110,33 +96,30 @@ export default function PricingPage() {
               "Horaires business + takeover",
             ]}
             cta={
-              <PricingPrimaryCta plan="business" />
+              <Button asChild size="lg" variant="outline" className="w-full bg-white">
+                <Link href="/app/profile">Contacter l’équipe</Link>
+              </Button>
             }
           />
-        </section>
 
-        {/* FOUNDER OFFER */}
-        <section className="mt-8 lg:mt-10">
-          <Card className="relative overflow-hidden border-[var(--brand-gold)]/30 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(22,163,74,0.10),rgba(255,255,255,0.55))] shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
-            <div className="pointer-events-none absolute inset-0 opacity-70 [background:radial-gradient(44rem_28rem_at_20%_10%,rgba(245,158,11,0.20),transparent_55%),radial-gradient(46rem_30rem_at_90%_80%,rgba(22,163,74,0.18),transparent_55%)]" />
-            <CardHeader className="relative">
-              <CardTitle className="text-[var(--brand-navy)]">Offre fondateur</CardTitle>
-              <CardDescription className="text-[var(--brand-navy)]/70">
-                Limitée aux 50 premiers utilisateurs
-              </CardDescription>
+          <Card className="lg:col-span-3 border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+            <CardHeader>
+              <CardTitle className="text-[var(--brand-navy)]">Accès fondateur</CardTitle>
+              <CardDescription className="text-[var(--brand-navy)]/70">Limitée aux 50 premiers utilisateurs</CardDescription>
             </CardHeader>
             <CardContent className="relative grid gap-4 p-3 sm:grid-cols-[1fr_auto] sm:items-center sm:p-6">
               <div className="text-sm leading-relaxed text-[var(--brand-navy)]/70">
                 Accès fondateur à tarif réduit. Réservez votre place et démarrez avec un avantage durable.
               </div>
               <Button asChild size="lg" className="h-11">
-                <Link href="/signup">Réserver ma place</Link>
+                <Link href="/signup">
+                  Réserver ma place <ArrowUpRight className="ml-2 size-4" />
+                </Link>
               </Button>
             </CardContent>
           </Card>
         </section>
 
-        {/* TRUST */}
         <section className="mt-8 lg:mt-10">
           <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-5 text-[var(--brand-navy)] shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
             <div className="text-sm font-semibold">Rentabilisé dès 1 vente supplémentaire.</div>
@@ -146,32 +129,17 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* FAQ */}
         <section className="mt-8 space-y-3 lg:mt-10">
           <div className="space-y-1">
             <h2 className="text-lg font-semibold text-[var(--brand-navy)] sm:text-xl">FAQ</h2>
-            <p className="text-sm text-[var(--brand-navy)]/65">
-              Des réponses claires pour acheter sereinement.
-            </p>
+            <p className="text-sm text-[var(--brand-navy)]/65">Des réponses claires pour acheter sereinement.</p>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <FaqCard
-              q="Puis-je annuler à tout moment ?"
-              a="Oui. Vous gardez l’accès jusqu’à la fin de la période en cours."
-            />
-            <FaqCard
-              q="L’essai gratuit dure vraiment 7 jours ?"
-              a="Oui, 7 jours complets pour tester l’outil dans vos conversations WhatsApp."
-            />
-            <FaqCard
-              q="Mobile Money arrive bientôt ?"
-              a="Oui, c'est en préparation. Le paiement intégré arrive bientôt."
-            />
-            <FaqCard
-              q="Puis-je changer de plan ?"
-              a="Oui. Vous pouvez upgrader ou ajuster votre plan selon votre volume."
-            />
+            <FaqCard q="Puis-je annuler à tout moment ?" a="Oui. Vous gardez l’accès jusqu’à la fin de la période en cours." />
+            <FaqCard q="L’essai gratuit dure vraiment 7 jours ?" a="Oui, 7 jours complets pour tester l’outil dans vos conversations WhatsApp." />
+            <FaqCard q="Mobile Money arrive bientôt ?" a="Oui, c'est en préparation. Le paiement intégré arrive bientôt." />
+            <FaqCard q="Puis-je changer de plan ?" a="Oui. Vous pouvez upgrader ou ajuster votre plan selon votre volume." />
           </div>
         </section>
       </main>
@@ -204,9 +172,7 @@ function PlanCard({
     <Card
       className={cn(
         "border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]",
-        highlight
-          ? "relative border-[var(--brand-green)]/22 shadow-[0_22px_60px_rgba(15,23,42,0.14)]"
-          : undefined,
+        highlight ? "relative border-[var(--brand-green)]/22 shadow-[0_22px_60px_rgba(15,23,42,0.14)]" : undefined,
       )}
     >
       <CardHeader>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { BadgeCheck, Building2, CheckCircle2, Globe, MapPin, MessageCircleMore, Target, User } from "lucide-react";
+import { Building2, CheckCircle2, Globe, MapPin, MessageCircleMore, Target, User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useProfile } from "@/lib/data/use-profile";
 import { createOptionalSupabaseClient } from "@/lib/data/supabase";
 import { computeMemoryStatus } from "@/lib/data/business-memory";
+import { Badge } from "@/components/premium/Badge";
 
 type ProfileForm = {
   full_name: string;
@@ -89,11 +90,9 @@ export function ProfileClient() {
   React.useEffect(() => {
     if (!dirty) return;
     if (loading) return;
-
     const handle = setTimeout(async () => {
       await saveNow({ showSuccessToast: false });
     }, 650);
-
     return () => clearTimeout(handle);
   }, [dirty, loading, form]);
 
@@ -133,162 +132,124 @@ export function ProfileClient() {
     }
   }
 
+  const completion = React.useMemo(() => {
+    const keys: (keyof ProfileForm)[] = ["full_name", "business_name", "business_type", "goal", "country", "city", "whatsapp", "offer"];
+    const filled = keys.filter((k) => String(form[k] ?? "").trim().length > 0).length;
+    return Math.round((filled / keys.length) * 100);
+  }, [form]);
+
+  const syncLabel = error
+    ? "Sync indisponible"
+    : loading
+      ? "Chargement…"
+      : saving
+        ? "Enregistrement…"
+        : dirty
+          ? "Sauvegarde auto…"
+          : "Tout est à jour";
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)] sm:text-3xl">Profil</h1>
-          <p className="text-sm text-[var(--brand-navy)]/65 sm:text-base">
-            Ces informations alimentent votre IA (générateur + assistant).
-          </p>
+          <p className="text-sm text-[var(--brand-navy)]/65 sm:text-base">Ces infos alimentent votre IA (générateur + assistant).</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" className="bg-white">
-            <Link href="/app">Dashboard</Link>
-          </Button>
-          <StatusPill loading={loading} saving={saving} dirty={dirty} error={error} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={mem.hasAny ? "success" : "gold"} title="Mémoire business pour l’IA">
+            <MessageCircleMore className="size-3.5 text-[var(--brand-green)]" />
+            Mémoire {mem.hasAny ? "active" : "à configurer"}
+          </Badge>
+          <Badge variant={dirty ? "gold" : "muted"}>{syncLabel}</Badge>
         </div>
       </div>
-      {error ? (
-        <div className="rounded-[var(--radius)] border border-[var(--brand-gold)]/30 bg-[rgba(245,158,11,0.08)] p-3 text-sm text-[var(--brand-navy)]/80">
-          <div className="font-medium text-[var(--brand-navy)]">Action requise</div>
-          <div className="mt-1">{error}</div>
-        </div>
-      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-3 lg:grid-cols-3">
         <Card className="border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)] lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-3 text-[var(--brand-navy)]">
-              <span>Business Memory</span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
-                  mem.status === "active"
-                    ? "border-[var(--brand-green)]/25 bg-[rgba(22,163,74,0.08)] text-[var(--brand-navy)]"
-                    : "border-[var(--brand-gold)]/35 bg-[rgba(245,158,11,0.10)] text-[var(--brand-navy)]",
-                )}
-              >
-                AI Memory Status: {mem.status === "active" ? "Active ✅" : "Incomplete ⚠️"}
-              </span>
-            </CardTitle>
-          <CardDescription>
-            Autosave instantané + synchronisation temps réel.
-              {lastSyncedAt ? (
-                <span className="ml-2 text-[var(--brand-navy)]/60">
-                  Dernière mise à jour: {new Date(lastSyncedAt).toLocaleString("fr-FR")}
-                </span>
-              ) : null}
-            </CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-[var(--brand-navy)]">Infos business</CardTitle>
+                <CardDescription>Plus le profil est complet, plus l’IA est pertinente.</CardDescription>
+              </div>
+              <div className="min-w-[160px]">
+                <div className="flex items-center justify-between text-xs text-[var(--brand-navy)]/60">
+                  <span className="font-medium text-[var(--brand-navy)]/70">Progression</span>
+                  <span className="font-semibold text-[var(--brand-navy)]">{completion}%</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--brand-navy)]/10">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,rgba(22,163,74,0.90),rgba(245,158,11,0.35))] transition-[width] duration-500"
+                    style={{ width: `${completion}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-4 p-4 sm:grid-cols-2 sm:p-6">
-            <Field icon={User} label="Nom complet" value={form.full_name} onChange={(v) => setField("full_name", v)} />
-            <Field
-              icon={Building2}
-              label="Nom du business"
-              value={form.business_name}
-              onChange={(v) => setField("business_name", v)}
-              required
-            />
-            <Field
-              icon={BadgeCheck}
-              label="Secteur (business)"
-              value={form.business_type}
-              onChange={(v) => setField("business_type", v)}
-              placeholder="Ex: vêtements, restaurant, coaching…"
-              required
-            />
-            <Field
-              icon={Target}
-              label="Objectif principal"
-              value={form.goal}
-              onChange={(v) => setField("goal", v)}
-              placeholder="Ex: vendre plus, support client…"
-              required
-            />
-            <Field
-              icon={Globe}
-              label="Pays"
-              value={form.country}
-              onChange={(v) => setField("country", v)}
-              required
-            />
-            <Field icon={MapPin} label="Ville" value={form.city} onChange={(v) => setField("city", v)} required />
-            <Field
-              icon={MessageCircleMore}
-              label="WhatsApp"
-              value={form.whatsapp}
-              onChange={(v) => setField("whatsapp", v)}
-              placeholder="+237..."
-            />
-            <Field
-              label="Offre (produit/service + prix si possible)"
-              value={form.offer}
-              onChange={(v) => setField("offer", v)}
-              placeholder="Ex: Packs skincare, livraison 24–48h…"
-            />
+            <Field icon={User} required label="Nom" value={form.full_name} onChange={(v) => setField("full_name", v)} placeholder="Ex: Nadine" />
+            <Field icon={Building2} required label="Nom de la société" value={form.business_name} onChange={(v) => setField("business_name", v)} placeholder="Ex: Nadine Beauty" />
+            <Field icon={Target} required label="Type de business" value={form.business_type} onChange={(v) => setField("business_type", v)} placeholder="Ex: e-commerce / service" />
+            <Field icon={Target} required label="Objectif principal" value={form.goal} onChange={(v) => setField("goal", v)} placeholder="Ex: +30% ventes WhatsApp" />
+            <Field icon={Globe} required label="Pays" value={form.country} onChange={(v) => setField("country", v)} placeholder="Ex: Cameroun" />
+            <Field icon={MapPin} required label="Ville" value={form.city} onChange={(v) => setField("city", v)} placeholder="Ex: Yaoundé" />
+            <Field label="WhatsApp" value={form.whatsapp} onChange={(v) => setField("whatsapp", v)} placeholder="+237..." />
+            <Field label="Offre (produit/service + prix si possible)" value={form.offer} onChange={(v) => setField("offer", v)} placeholder="Ex: Packs skincare, livraison 24–48h…" />
             <Field
               label="Email"
               value={form.email || accountEmail || ""}
               onChange={(v) => setField("email", v)}
               placeholder="email@exemple.com"
-              helper="Utilisé pour support et compte. Si vide, on prend l'email du compte."
-              disabled={false}
+              helper="Utilisé pour support et compte. Si vide, on prend l’email du compte."
             />
+            <div className="hidden sm:block" />
           </CardContent>
         </Card>
 
-        <Card className="border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
-          <CardHeader>
-            <CardTitle className="text-[var(--brand-navy)]">Compte</CardTitle>
-            <CardDescription>Données liées à l'auth Supabase.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 p-4 sm:p-6">
-            <AccountRow label="Email connecté" value={accountEmail ?? "—"} />
-            <AccountRow
-              label="Membre depuis"
-              value={signedUpAt ? new Date(signedUpAt).toLocaleDateString("fr-FR") : "—"}
-              icon={CheckCircle2}
-            />
-            <Button asChild variant="outline" className="w-full bg-white">
-              <Link href="/pricing">Voir les plans</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+        <div className="space-y-3">
+          <Card className="border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+            <CardHeader>
+              <CardTitle className="text-[var(--brand-navy)]">Compte</CardTitle>
+              <CardDescription>Données liées à l’auth Supabase.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 sm:p-6">
+              <AccountRow label="Email connecté" value={accountEmail ?? "—"} />
+              <AccountRow label="Membre depuis" value={signedUpAt ? new Date(signedUpAt).toLocaleDateString("fr-FR") : "—"} icon={CheckCircle2} />
+              <AccountRow
+                label="Dernière sauvegarde"
+                value={lastSyncedAt ? new Date(lastSyncedAt).toLocaleString("fr-FR") : "—"}
+                icon={CheckCircle2}
+              />
+              <Button asChild variant="outline" className="w-full bg-white">
+                <Link href="/pricing">Voir les plans</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[rgba(245,158,11,0.25)] bg-[linear-gradient(135deg,rgba(245,158,11,0.12),rgba(22,163,74,0.08))] shadow-[0_18px_55px_rgba(15,23,42,0.10)]">
+            <CardHeader>
+              <CardTitle className="text-[var(--brand-navy)]">Mémoire IA</CardTitle>
+              <CardDescription>Activez un contexte business stable pour des réponses plus “closing”.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4 sm:p-6">
+              <div className="rounded-2xl border border-[var(--brand-navy)]/10 bg-white/80 p-3 text-sm text-[var(--brand-navy)]/75">
+                <span className="font-semibold text-[var(--brand-navy)]">Conseil :</span> décrivez votre offre, votre prix et votre zone de livraison.
+              </div>
+              <Button asChild className="w-full">
+                <Link href="/app/chat">Tester l’assistant IA</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
       <div className="sticky bottom-0 z-10 -mx-4 border-t border-[var(--brand-navy)]/10 bg-white/80 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/70 sm:hidden">
         <Button size="lg" className="h-11 w-full" disabled>
-          {saving ? "Enregistrement…" : dirty ? "Synchronisation…" : "Tout est à jour"}
+          {syncLabel}
         </Button>
       </div>
     </div>
-  );
-}
-
-function StatusPill({
-  loading,
-  saving,
-  dirty,
-  error,
-}: {
-  loading: boolean;
-  saving: boolean;
-  dirty: boolean;
-  error: string | null;
-}) {
-  const label = error ? "Sync indisponible" : loading ? "Chargement…" : saving ? "Enregistrement…" : dirty ? "En attente…" : "À jour";
-  return (
-    <span
-      className={cn(
-        "inline-flex h-11 items-center rounded-full border px-4 text-sm font-medium shadow-sm",
-        error
-          ? "border-[var(--brand-gold)]/35 bg-[rgba(245,158,11,0.10)] text-[var(--brand-navy)]"
-          : "border-[var(--brand-navy)]/10 bg-white text-[var(--brand-navy)]/80",
-      )}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -363,3 +324,4 @@ function AccountRow({
     </div>
   );
 }
+

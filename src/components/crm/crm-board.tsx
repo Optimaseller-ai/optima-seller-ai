@@ -74,7 +74,7 @@ export function CrmBoard({ initial }: { initial: Prospect[] }) {
       try {
         await updateProspectStatus({ id: activeId, status: nextStatus });
       } catch {
-        toast({ title: "Mode demo", description: "Activez Supabase pour sauvegarder les mouvements." });
+        toast({ title: "Mode démo", description: "Activez Supabase pour sauvegarder les mouvements." });
       }
       return;
     }
@@ -92,7 +92,7 @@ export function CrmBoard({ initial }: { initial: Prospect[] }) {
       try {
         await updateProspectStatus({ id: activeId, status: overItem.status });
       } catch {
-        toast({ title: "Mode demo", description: "Activez Supabase pour sauvegarder les mouvements." });
+        toast({ title: "Mode démo", description: "Activez Supabase pour sauvegarder les mouvements." });
       }
       return;
     }
@@ -262,7 +262,7 @@ function NotesButton({
     } catch {
       onSaved(prospect.id, notes || null);
       setOpen(false);
-      toast({ title: "Mode demo", description: "Notes sauvegardees localement." });
+      toast({ title: "Mode démo", description: "Notes sauvegardées localement." });
     } finally {
       setSaving(false);
     }
@@ -328,7 +328,7 @@ function AddProspect({ onAdd }: { onAdd: (p: Prospect) => void }) {
       };
       onAdd(demo);
       setOpen(false);
-      toast({ title: "Mode demo", description: "Prospect ajoute localement." });
+      toast({ title: "Mode démo", description: "Prospect ajouté localement." });
     } finally {
       setSaving(false);
     }

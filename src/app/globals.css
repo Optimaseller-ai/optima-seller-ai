@@ -75,6 +75,11 @@ body {
   color: hsl(var(--foreground));
 }
 
+/* Premium defaults */
+::selection {
+  background: rgba(22, 163, 74, 0.22);
+}
+
 /* Subtle, premium interactions */
 @media (prefers-reduced-motion: no-preference) {
   :root {
@@ -92,5 +97,59 @@ body {
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chatInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(14px) scale(0.98);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes chatInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-14px) scale(0.98);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes typingDot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 0.95;
   }
 }

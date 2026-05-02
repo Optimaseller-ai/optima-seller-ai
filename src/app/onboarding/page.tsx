@@ -80,7 +80,7 @@ export default function OnboardingPage() {
       const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
       if (error) throw error;
 
-      toast({ title: "Onboarding termine", description: "Bienvenue dans Optima Seller AI." });
+      toast({ title: "Onboarding terminé", description: "Bienvenue dans Optima Seller AI." });
       window.localStorage.removeItem("optima:onboarding");
       router.push("/app");
     } catch (err: unknown) {
@@ -88,7 +88,7 @@ export default function OnboardingPage() {
         title: "Sauvegarde impossible",
         description:
           getErrorMessage(err) ??
-          "Mode demo: configurez Supabase pour sauvegarder. Vous pouvez quand meme visiter l'app.",
+          "Mode démo : configurez Supabase pour sauvegarder. Vous pouvez quand même visiter l’app.",
         variant: "destructive",
       });
       router.push("/app");
@@ -103,7 +103,7 @@ export default function OnboardingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Configuration rapide</CardTitle>
-            <CardDescription>3 etapes. Mobile-first, simple et rapide.</CardDescription>
+            <CardDescription>3 étapes. Mobile-first, simple et rapide.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <Stepper step={step} />
@@ -111,7 +111,7 @@ export default function OnboardingPage() {
             {step === 1 ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <Tag className="size-4 text-primary" /> Type de business
+                  <Tag className="size-4 text-primary" /> Type d’activité
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {BUSINESS_TYPES.map((t) => (
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
             ) : null}
 
             <p className="text-xs text-muted-foreground">
-              Vos infos servent a personnaliser le ton des messages. Vous pourrez les modifier plus tard.
+              Vos infos servent à personnaliser le ton des messages. Vous pourrez les modifier plus tard.
             </p>
           </CardContent>
         </Card>

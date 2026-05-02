@@ -29,5 +29,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // If table/policies aren't ready yet, don't block the user.
   }
 
-  return <AppShell>{children}</AppShell>;
+  return <AppShell initialUserId={data.user.id}>{children}</AppShell>;
 }

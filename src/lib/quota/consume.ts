@@ -16,7 +16,7 @@ export async function ensureSubscriptionRow(userId: string) {
   const { data: created, error } = await supabase
     .from("subscriptions")
     .upsert(
-      { user_id: userId, plan: "free", quota_limit: 10, quota_used: 0, updated_at: new Date().toISOString() },
+      { user_id: userId, plan: "free", quota_limit: 100, quota_used: 0, updated_at: new Date().toISOString() },
       { onConflict: "user_id" },
     )
     .select("user_id,plan,quota_limit,quota_used")
@@ -46,7 +46,12 @@ export async function consumeOneGenerationOrThrow(userId: string) {
   const sub = await ensureSubscriptionRow(userId);
 
   const plan = isProActive(sub) ? "pro" : "free";
-  const quotaLimit = typeof sub.quota_limit === "number" ? sub.quota_limit : plan === "pro" ? 500 : 10;
+  const quotaLimit =
+    plan === "pro"
+      ? typeof sub.quota_limit === "number"
+        ? sub.quota_limit
+        : 2000
+      : 100;
 
   const periodStart = DateTime.utc().startOf("month").toISODate();
   const { data: counter, error: counterErr } = await supabase
@@ -103,4 +108,6 @@ export async function consumeOneGenerationOrThrow(userId: string) {
     .from("subscriptions")
     .update({ plan, quota_limit: quotaLimit, quota_used: nextUsed, updated_at: new Date().toISOString() })
     .eq("user_id", userId);
+
+  return { plan, quotaLimit, quotaUsed: nextUsed } as const;
 }

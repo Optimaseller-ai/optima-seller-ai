@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { ProfileRow } from "@/lib/data/types";
-import { createOptionalSupabaseClient } from "@/lib/data/supabase";
+import { authGetUserCoalesced, createOptionalSupabaseClient } from "@/lib/data/supabase";
 
 const SELECT =
   "id,full_name,business_name,business_type,goal,country,city,whatsapp,offer,email,created_at,updated_at,first_name,shop_name,main_goal,whatsapp_number,offer_description";
@@ -89,7 +89,7 @@ export function useProfile(): UseProfileState {
 
     setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await authGetUserCoalesced(supabase);
       if (!auth.user) {
         setUserId(null);
         setProfile(null);
@@ -153,7 +153,7 @@ export function useProfile(): UseProfileState {
       const supabase = createOptionalSupabaseClient();
       if (!supabase) throw new Error("Supabase non configuré.");
 
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await authGetUserCoalesced(supabase);
       if (!auth.user) throw new Error("Connexion requise.");
 
       const payload: Record<string, unknown> = {

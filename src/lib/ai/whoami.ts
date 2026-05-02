@@ -23,7 +23,19 @@ export function isWhoAmIIntent(message: string) {
     .trim();
 
   if (!normalized) return false;
-  return /\bqui\s+sui[s]?\s+je\b/.test(normalized) || /\bwho\s+am\s+i\b/.test(normalized);
+  return (
+    /\bqui\s+sui[s]?\s+je\b/.test(normalized) ||
+    /\bwho\s+am\s+i\b/.test(normalized) ||
+    // Business identity (French)
+    /\bquel\s+est\s+mon\s+business\b/.test(normalized) ||
+    /\bquel\s+est\s+le\s+nom\s+de\s+mon\s+business\b/.test(normalized) ||
+    /\bquel(le)?\s+est\s+mon\s+activite\b/.test(normalized) ||
+    /\bquel(le)?\s+est\s+mon\s+metier\b/.test(normalized) ||
+    // Offer identity (French)
+    /\bque\s+je\s+vends\b/.test(normalized) ||
+    /\bqu\s+est\s+ce\s+que\s+je\s+vends\b/.test(normalized) ||
+    /\bqu\s+est\s+ce\s+que\s+je\s+propose\b/.test(normalized)
+  );
 }
 
 export function formatWhoAmIResponse(profile: BusinessProfile) {
@@ -58,4 +70,3 @@ export function formatWhoAmIResponse(profile: BusinessProfile) {
 
   return parts.join("\n");
 }
-

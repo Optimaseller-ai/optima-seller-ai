@@ -28,7 +28,7 @@ export function AuthShell({
         <div className="order-2 hidden lg:flex lg:order-1">
           <div className="w-full rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white/70 p-10 shadow-[0_22px_60px_rgba(15,23,42,0.12)]">
             <div className="flex items-center gap-3">
-              <BrandLogo className="text-[var(--brand-navy)]" />
+              <BrandLogo size="desktop" className="text-[var(--brand-navy)]" />
             </div>
 
             <div className="mt-8 space-y-3">
@@ -87,4 +87,3 @@ export function AuthShell({
     </div>
   );
 }
-

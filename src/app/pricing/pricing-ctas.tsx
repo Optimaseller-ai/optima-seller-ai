@@ -1,66 +1,21 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
-import { DateTime } from "luxon";
+import { useUserPlan } from "@/lib/data/use-user-plan";
+import { UpgradeButton } from "@/components/premium/UpgradeButton";
 
 type Plan = "free" | "pro" | "business";
-type UserPlan = "free" | "pro";
 
 export function PricingPrimaryCta({ plan }: { plan: Plan }) {
   const { toast } = useToast();
-  const [loaded, setLoaded] = React.useState(false);
-  const [isAuthed, setIsAuthed] = React.useState(false);
-  const [userPlan, setUserPlan] = React.useState<UserPlan>("free");
+  const u = useUserPlan();
 
-  React.useEffect(() => {
-    let canceled = false;
-    async function load() {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (canceled) return;
-        setIsAuthed(Boolean(data.user));
+  if (u.loading) return <div className="h-11 w-full rounded-[var(--radius)] bg-[var(--brand-navy)]/5" />;
 
-        if (!data.user) {
-          setUserPlan("free");
-          return;
-        }
-
-        const { data: sub } = await supabase
-          .from("subscriptions")
-          .select("plan")
-          .eq("user_id", data.user.id)
-          .maybeSingle();
-
-        if (canceled) return;
-
-        if (sub?.plan === "pro") {
-          setUserPlan("pro");
-        } else {
-          setUserPlan("free");
-        }
-      } catch {
-        if (canceled) return;
-        setIsAuthed(false);
-        setUserPlan("free");
-      } finally {
-        if (!canceled) setLoaded(true);
-      }
-    }
-    void load();
-    return () => {
-      canceled = true;
-    };
-  }, []);
-
-  if (!loaded) return <div className="h-11 w-full rounded-[var(--radius)] bg-[var(--brand-navy)]/5" />;
-
-  if (!isAuthed) {
+  if (!u.isLoggedIn) {
     return (
       <Button asChild size="lg" className="w-full">
         <Link href="/signup">Créer un compte</Link>
@@ -69,15 +24,26 @@ export function PricingPrimaryCta({ plan }: { plan: Plan }) {
   }
 
   if (plan === "free") {
+    if (u.isPro) {
+      return (
+        <Button size="lg" variant="outline" className="w-full pointer-events-none bg-white opacity-70">
+          Inclus dans votre abonnement
+        </Button>
+      );
+    }
+
     return (
-      <Button asChild size="lg" variant="outline" className="w-full bg-white">
-        <Link href="/app">Aller au dashboard</Link>
+      <Button size="lg" variant="outline" className="w-full pointer-events-none bg-white opacity-70">
+        Plan actuel
       </Button>
     );
   }
 
   if (plan === "pro") {
-    const active = userPlan === "pro";
+    const active = u.isPro;
+    if (!active) {
+      return <UpgradeButton className="w-full justify-center" label="Passer au plan Pro" />;
+    }
     return (
       <Button
         asChild={!active}
@@ -85,10 +51,10 @@ export function PricingPrimaryCta({ plan }: { plan: Plan }) {
         className={cn("w-full", active ? "pointer-events-none opacity-70" : undefined)}
         onClick={() => {
           if (active) return;
-          toast({ title: "Optima Pro", description: "Disponible bientôt." });
+          if (u.isFree) toast({ title: "Optima Pro", description: "Redirection…" });
         }}
       >
-        {active ? <span>Plan actif</span> : <span>Disponible bientôt</span>}
+        <span>Plan Pro actif</span>
       </Button>
     );
   }
@@ -109,31 +75,8 @@ export function PricingPrimaryCta({ plan }: { plan: Plan }) {
 }
 
 export function PricingTrialCta() {
-  const [loaded, setLoaded] = React.useState(false);
-  const [isAuthed, setIsAuthed] = React.useState(false);
-
-  React.useEffect(() => {
-    let canceled = false;
-    async function load() {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (canceled) return;
-        setIsAuthed(Boolean(data.user));
-      } catch {
-        if (canceled) return;
-        setIsAuthed(false);
-      } finally {
-        if (!canceled) setLoaded(true);
-      }
-    }
-    void load();
-    return () => {
-      canceled = true;
-    };
-  }, []);
-
-  if (!loaded || isAuthed) return null;
+  const u = useUserPlan();
+  if (u.loading || u.isLoggedIn) return null;
 
   return (
     <Button asChild size="lg" variant="outline" className="w-full bg-white">

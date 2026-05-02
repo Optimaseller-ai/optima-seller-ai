@@ -6,19 +6,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius)] text-sm font-medium transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:translate-y-px motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow",
+        default:
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-[0_14px_40px_rgba(22,163,74,0.18)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
         secondary:
-          "bg-muted text-foreground hover:bg-muted/80 border border-border shadow-sm hover:shadow",
-        outline: "border border-input bg-transparent hover:bg-muted/60 shadow-sm hover:shadow",
-        ghost: "hover:bg-muted/60",
+          "border border-border bg-muted text-foreground shadow-sm hover:bg-muted/80 hover:shadow hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
+        outline:
+          "border border-input bg-transparent shadow-sm hover:bg-muted/60 hover:shadow hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
+        ghost: "hover:bg-muted/60 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
         gold:
-          "bg-[var(--brand-gold)] text-black hover:opacity-90 shadow-sm hover:shadow focus-visible:ring-[var(--brand-gold)]",
+          "bg-[var(--brand-gold)] text-black shadow-sm hover:opacity-95 hover:shadow-[0_14px_40px_rgba(245,158,11,0.18)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-[var(--brand-gold)]",
         destructive:
-          "bg-red-600 text-white hover:bg-red-600/90 shadow-sm hover:shadow focus-visible:ring-red-600",
+          "bg-red-600 text-white shadow-sm hover:bg-red-600/90 hover:shadow hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-red-600",
       },
       size: {
         sm: "h-10 px-3 text-sm",

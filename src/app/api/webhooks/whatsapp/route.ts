@@ -34,6 +34,12 @@ export async function POST(req: Request) {
   const rawBody = await req.text();
   const sig = req.headers.get("x-hub-signature-256");
 
+  console.log("WhatsApp webhook POST received", {
+    hasSig: Boolean(sig),
+    length: rawBody.length,
+    contentType: req.headers.get("content-type"),
+  });
+
   try {
     // Signature verification requires WHATSAPP_APP_SECRET.
     // In quick-start environments, allow missing secret (still works, but less secure).
@@ -65,8 +71,16 @@ export async function POST(req: Request) {
   const text = message?.text?.body ? String(message.text.body) : null;
 
   if (!phoneNumberId || !from || !text) {
+    console.log("WhatsApp webhook ignored (missing fields)", {
+      phoneNumberId,
+      from,
+      hasText: Boolean(text),
+      hasStatuses: Boolean(value?.statuses?.length),
+    });
     return NextResponse.json({ ok: true, ignored: true });
   }
+
+  console.log("WhatsApp inbound message", { phoneNumberId, from, textPreview: text.slice(0, 120) });
 
   // Load connection by phone_number_id
   let { data: conn, error: connErr } = await admin
@@ -74,7 +88,10 @@ export async function POST(req: Request) {
     .select("id,user_id,phone_number_id,token_enc,token_iv,token_tag,auto_reply_enabled,paused,human_needed")
     .eq("phone_number_id", phoneNumberId)
     .maybeSingle();
-  if (connErr) return NextResponse.json({ ok: false, error: connErr.message }, { status: 500 });
+  if (connErr) {
+    console.error("WhatsApp webhook connection lookup error:", connErr);
+    return NextResponse.json({ ok: false, error: connErr.message }, { status: 500 });
+  }
 
   // Quick-start: support single-tenant env vars (META_ACCESS_TOKEN + META_PHONE_NUMBER_ID)
   if (!conn?.user_id && env.META_ACCESS_TOKEN && env.META_PHONE_NUMBER_ID && env.META_PHONE_NUMBER_ID === phoneNumberId) {
@@ -82,10 +99,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, ignored: true, hint: "Configure /app/integrations/whatsapp to bind this number to a user." });
   }
 
-  if (!conn?.user_id) return NextResponse.json({ ok: true, ignored: true });
+  if (!conn?.user_id) {
+    console.log("WhatsApp webhook ignored (no connection bound to user)", { phoneNumberId });
+    return NextResponse.json({ ok: true, ignored: true });
+  }
+
+  // Token expiry guard (best-effort): mark as expired and pause if expired.
+  const { data: connMeta } = await admin
+    .from("whatsapp_connections")
+    .select("token_expires_at,status")
+    .eq("id", conn.id)
+    .maybeSingle();
+  if (connMeta?.token_expires_at) {
+    const exp = new Date(connMeta.token_expires_at).getTime();
+    if (Number.isFinite(exp) && Date.now() > exp - 30_000) {
+      await admin
+        .from("whatsapp_connections")
+        .update({ status: "expired", paused: true, last_error: "Token Meta expiré. Reconnectez WhatsApp.", updated_at: new Date().toISOString() })
+        .eq("id", conn.id);
+      return NextResponse.json({ ok: true, paused: true, reason: "TOKEN_EXPIRED" });
+    }
+  }
 
   // Basic gates
   if (!conn.auto_reply_enabled || conn.paused || conn.human_needed) {
+    console.log("WhatsApp webhook gated (disabled/paused/human)", {
+      auto_reply_enabled: conn.auto_reply_enabled,
+      paused: conn.paused,
+      human_needed: conn.human_needed,
+    });
     return NextResponse.json({ ok: true, paused: true });
   }
 
@@ -96,6 +138,7 @@ export async function POST(req: Request) {
     .eq("user_id", conn.user_id)
     .maybeSingle();
   if ((sub?.plan ?? "free") !== "pro") {
+    console.log("WhatsApp webhook ignored (not pro)", { userId: conn.user_id, plan: sub?.plan ?? "free" });
     return NextResponse.json({ ok: true, ignored: true });
   }
 
@@ -211,6 +254,7 @@ export async function POST(req: Request) {
   } as any);
 
   if (!res.ok) {
+    console.error("WhatsApp webhook chat-core error:", res);
     return NextResponse.json({ ok: false, error: res.error }, { status: res.status });
   }
 
@@ -221,7 +265,12 @@ export async function POST(req: Request) {
 
   // Anti-robot: small human-like delay before replying (3-12s).
   await sleep(randomInt(3_000, 12_000));
-  await sendWhatsAppText({ token, phoneNumberId, to: from, text: reply });
+  try {
+    await sendWhatsAppText({ token, phoneNumberId, to: from, text: reply });
+  } catch (e) {
+    console.error("WhatsApp webhook send error:", e);
+    throw e;
+  }
 
   await admin.from("messages").insert({
     user_id: conn.user_id,

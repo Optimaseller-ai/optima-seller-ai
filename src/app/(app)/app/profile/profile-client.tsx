@@ -13,6 +13,7 @@ import { useProfile } from "@/lib/data/use-profile";
 import { createOptionalSupabaseClient } from "@/lib/data/supabase";
 import { computeMemoryStatus } from "@/lib/data/business-memory";
 import { Badge } from "@/components/premium/Badge";
+import { WhatsAppConnectClient } from "@/app/(app)/app/whatsapp/whatsapp-connect-client";
 
 type ProfileForm = {
   full_name: string;
@@ -49,6 +50,15 @@ export function ProfileClient() {
   const [accountEmail, setAccountEmail] = React.useState<string | null>(null);
   const [signedUpAt, setSignedUpAt] = React.useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = React.useState<string | null>(null);
+  const [wa, setWa] = React.useState<null | {
+    status?: string | null;
+    display_phone_number?: string | null;
+    verified_name?: string | null;
+    phone_number_id?: string | null;
+    last_synced_at?: string | null;
+    last_error?: string | null;
+  }>(null);
+  const [waLoading, setWaLoading] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -88,13 +98,25 @@ export function ProfileClient() {
   }, [remoteProfile]);
 
   React.useEffect(() => {
-    if (!dirty) return;
-    if (loading) return;
-    const handle = setTimeout(async () => {
-      await saveNow({ showSuccessToast: false });
-    }, 650);
-    return () => clearTimeout(handle);
-  }, [dirty, loading, form]);
+    let cancelled = false;
+    async function loadWhatsAppStatus() {
+      setWaLoading(true);
+      try {
+        const resp = await fetch("/api/integrations/whatsapp/status");
+        const json = (await resp.json().catch(() => ({}))) as any;
+        if (cancelled) return;
+        if (resp.ok && json?.success) setWa(json.connection ?? null);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setWaLoading(false);
+      }
+    }
+    void loadWhatsAppStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function setField<K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -145,11 +167,50 @@ export function ProfileClient() {
       : saving
         ? "Enregistrement…"
         : dirty
-          ? "Sauvegarde auto…"
+          ? "Modifications non enregistrées"
           : "Tout est à jour";
 
   return (
     <div className="space-y-6 sm:space-y-8">
+      <div className="rounded-[var(--radius)] border border-[rgba(22,163,74,0.20)] bg-[linear-gradient(135deg,rgba(22,163,74,0.10),rgba(245,158,11,0.08))] p-4 shadow-[0_18px_55px_rgba(15,23,42,0.10)] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="text-xl font-semibold tracking-tight text-[var(--brand-navy)]">Connectez votre WhatsApp</div>
+            <div className="text-sm text-[var(--brand-navy)]/70">Reliez votre compte en 60 secondes pour activer l’IA auto-réponse.</div>
+            {wa?.status === "connected" ? (
+              <div className="mt-3 grid gap-1 text-sm text-[var(--brand-navy)]/75">
+                <div>
+                  <span className="font-semibold text-[var(--brand-navy)]">Statut :</span> Connecté
+                </div>
+                <div>
+                  <span className="font-semibold text-[var(--brand-navy)]">Numéro relié :</span>{" "}
+                  {wa.display_phone_number || wa.verified_name || wa.phone_number_id || "—"}
+                </div>
+                <div>
+                  <span className="font-semibold text-[var(--brand-navy)]">Dernière synchronisation :</span>{" "}
+                  {wa.last_synced_at ? new Date(wa.last_synced_at).toLocaleString("fr-FR") : "—"}
+                </div>
+              </div>
+            ) : null}
+            {wa?.last_error ? <div className="mt-2 text-sm text-red-700">{wa.last_error}</div> : null}
+          </div>
+
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <WhatsAppConnectClient connected={wa?.status === "connected"} />
+            {waLoading ? <div className="text-xs text-[var(--brand-navy)]/60">Chargement…</div> : null}
+          </div>
+        </div>
+
+        <details className="mt-4 rounded-2xl border border-[var(--brand-navy)]/10 bg-white/70 px-4 py-3">
+          <summary className="cursor-pointer select-none text-sm font-medium text-[var(--brand-navy)]">Options avancées</summary>
+          <div className="mt-2 text-sm text-[var(--brand-navy)]/70">
+            <div>Connexion manuelle (expert) :</div>
+            <a className="mt-1 inline-flex font-medium underline underline-offset-4" href="/app/integrations/whatsapp">
+              Ouvrir la configuration manuelle
+            </a>
+          </div>
+        </details>
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)] sm:text-3xl">Profil</h1>
@@ -162,6 +223,9 @@ export function ProfileClient() {
             Mémoire {mem.hasAny ? "active" : "à configurer"}
           </Badge>
           <Badge variant={dirty ? "gold" : "muted"}>{syncLabel}</Badge>
+          <Button onClick={() => saveNow()} disabled={Boolean(error) || loading || saving || !dirty} className="h-9">
+            Enregistrer
+          </Button>
         </div>
       </div>
 
@@ -245,8 +309,8 @@ export function ProfileClient() {
       </section>
 
       <div className="sticky bottom-0 z-10 -mx-4 border-t border-[var(--brand-navy)]/10 bg-white/80 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/70 sm:hidden">
-        <Button size="lg" className="h-11 w-full" disabled>
-          {syncLabel}
+        <Button size="lg" className="h-11 w-full" disabled={Boolean(error) || loading || saving || !dirty} onClick={() => saveNow()}>
+          {saving ? "Enregistrement…" : "Enregistrer"}
         </Button>
       </div>
     </div>
@@ -324,4 +388,3 @@ function AccountRow({
     </div>
   );
 }
-

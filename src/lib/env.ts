@@ -21,6 +21,12 @@ const envSchema = z.object({
   WHATSAPP_APP_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
   WHATSAPP_TOKEN_ENC_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
 
+  // Meta OAuth / Embedded Signup
+  META_APP_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
+  META_APP_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
+  META_CONFIG_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
+  META_OAUTH_STATE_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
+
   // Back-compat / quick-start single-tenant envs
   META_ACCESS_TOKEN: optionalTrimmed.pipe(z.string().min(1).optional()),
   META_PHONE_NUMBER_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
@@ -41,6 +47,11 @@ export const env = envSchema.parse({
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
   WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET,
   WHATSAPP_TOKEN_ENC_KEY: process.env.WHATSAPP_TOKEN_ENC_KEY,
+
+  META_APP_ID: process.env.META_APP_ID,
+  META_APP_SECRET: process.env.META_APP_SECRET,
+  META_CONFIG_ID: process.env.META_CONFIG_ID,
+  META_OAUTH_STATE_SECRET: process.env.META_OAUTH_STATE_SECRET,
 
   META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
   META_PHONE_NUMBER_ID: process.env.META_PHONE_NUMBER_ID,

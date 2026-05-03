@@ -35,6 +35,7 @@ Connexion WhatsApp…
 export async function GET(req: Request) {
   const h = await headers();
   const origin = h.get("origin") ?? "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? origin;
 
   try {
     const url = new URL(req.url);
@@ -66,7 +67,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const redirectUri = `${origin}/api/integrations/whatsapp/meta/callback`;
+    const redirectUri = `${baseUrl}/api/integrations/whatsapp/meta/callback`;
     const tokenRes = await exchangeCodeForToken({ code: parsed.data.code, redirectUri });
 
     const dbg = await debugToken({ accessToken: tokenRes.access_token });

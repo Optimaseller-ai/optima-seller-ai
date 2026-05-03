@@ -44,7 +44,7 @@ export function verifySignedState(signed: string) {
 
 export function buildEmbeddedSignupUrl(opts: { redirectUri: string; signedState: string }) {
   requireMetaEnv();
-  const u = new URL("https://www.facebook.com/v23.0/dialog/oauth");
+  const u = new URL("https://www.facebook.com/v18.0/dialog/oauth");
   u.searchParams.set("client_id", env.META_APP_ID!);
   u.searchParams.set("redirect_uri", opts.redirectUri);
   u.searchParams.set("state", opts.signedState);
@@ -138,4 +138,3 @@ export async function subscribeAppToWaba(opts: { accessToken: string; wabaId: st
   }
   return json as unknown;
 }
-

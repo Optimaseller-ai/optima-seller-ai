@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
 let inFlightGetUser: Promise<{ data: { user: unknown | null } }> | null = null;
+let inFlightGetSession: Promise<{ data: { session: unknown | null } }> | null = null;
 
 export function createOptionalSupabaseClient() {
   try {
@@ -28,4 +29,18 @@ export async function authGetUserCoalesced(supabase: { auth: { getUser: () => Pr
       });
   }
   return inFlightGetUser;
+}
+
+export async function authGetSessionCoalesced(supabase: { auth: { getSession: () => Promise<{ data: { session: unknown | null } }> } }) {
+  if (!inFlightGetSession) {
+    inFlightGetSession = supabase.auth
+      .getSession()
+      .catch((err) => {
+        throw err;
+      })
+      .finally(() => {
+        inFlightGetSession = null;
+      });
+  }
+  return inFlightGetSession;
 }

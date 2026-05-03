@@ -19,7 +19,7 @@ export function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
+            response.cookies.set(name, value, { ...options, httpOnly: false }),
           );
         },
       },

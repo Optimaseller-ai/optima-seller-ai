@@ -3,7 +3,7 @@
 import * as React from "react";
 import { DateTime } from "luxon";
 import type { SubscriptionPlan, SubscriptionRow } from "@/lib/data/types";
-import { authGetUserCoalesced, createOptionalSupabaseClient } from "@/lib/data/supabase";
+import { authGetSessionCoalesced, authGetUserCoalesced, createOptionalSupabaseClient } from "@/lib/data/supabase";
 
 const DEFAULTS: Record<SubscriptionPlan, { quota_limit: number }> = {
   free: { quota_limit: 100 },
@@ -68,19 +68,25 @@ export function useSubscription(): UseSubscriptionState {
 
     setLoading(true);
     try {
+      // Fast-path: resolve a session locally (cookie/localStorage) before calling getUser().
+      const { data: sessionData } = await authGetSessionCoalesced(supabase as any);
+      const sessionUserId =
+        (sessionData as any)?.session?.user?.id ? String((sessionData as any).session.user.id) : null;
+
       const { data: auth } = await authGetUserCoalesced(supabase);
-      if (!auth.user) {
+      const effectiveUserId = (auth as any)?.user?.id ? String((auth as any).user.id) : sessionUserId;
+      if (!effectiveUserId) {
         setUserId(null);
         setSubscription(null);
         setError(null);
         return;
       }
-      setUserId(auth.user.id);
+      setUserId(effectiveUserId);
 
       const { data: row, error: dbErr } = await supabase
         .from("subscriptions")
         .select("user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at")
-        .eq("user_id", auth.user.id)
+        .eq("user_id", effectiveUserId)
         .maybeSingle();
 
       if (dbErr) throw dbErr;
@@ -89,7 +95,7 @@ export function useSubscription(): UseSubscriptionState {
 
       if (!row) {
         const payload = {
-          user_id: auth.user.id,
+          user_id: effectiveUserId,
           plan: "free",
           quota_limit: DEFAULTS.free.quota_limit,
           quota_used: 0,
@@ -111,7 +117,7 @@ export function useSubscription(): UseSubscriptionState {
         const { data: usage, error: usageErr } = await supabase
           .from("usage_monthly")
           .select("used")
-          .eq("user_id", auth.user.id)
+          .eq("user_id", effectiveUserId)
           .eq("period_start", periodStart)
           .maybeSingle();
         if (usageErr) throw usageErr;
@@ -121,7 +127,7 @@ export function useSubscription(): UseSubscriptionState {
           await supabase
             .from("subscriptions")
             .update({ quota_used: usedThisMonth, updated_at: new Date().toISOString() })
-            .eq("user_id", auth.user.id);
+            .eq("user_id", effectiveUserId);
         }
       }
 
@@ -131,7 +137,7 @@ export function useSubscription(): UseSubscriptionState {
         await supabase
           .from("subscriptions")
           .update({ quota_limit: DEFAULTS[next.plan].quota_limit, updated_at: new Date().toISOString() })
-          .eq("user_id", auth.user.id);
+          .eq("user_id", effectiveUserId);
       }
 
       setSubscription(next);
@@ -161,6 +167,34 @@ export function useSubscription(): UseSubscriptionState {
           const next = (payload.new ?? payload.old) as any;
           if (!next) return;
           setSubscription(normalizeSub(next));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [channelSuffix, userId]);
+
+  // Realtime: usage_monthly is the source of truth for "used this month".
+  React.useEffect(() => {
+    if (!userId) return;
+    const supabase = createOptionalSupabaseClient();
+    if (!supabase) return;
+
+    const periodStart = DateTime.utc().startOf("month").toISODate();
+
+    const channel = supabase
+      .channel(`usage_monthly:${userId}:${periodStart}:${channelSuffix}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "usage_monthly", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const next = (payload.new ?? payload.old) as any;
+          if (!next) return;
+          if (String(next.period_start ?? "") !== String(periodStart)) return;
+          const usedThisMonth = typeof next.used === "number" ? next.used : 0;
+          setSubscription((prev) => (prev ? { ...prev, quota_used: usedThisMonth } : prev));
         },
       )
       .subscribe();

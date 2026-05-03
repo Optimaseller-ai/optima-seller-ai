@@ -54,7 +54,8 @@ export default function PricingPage() {
             highlight
             badge="Le plus rentable"
             features={[
-              "Quota élevé IA",
+              "Quota élevé IA (2000 générations / mois)",
+              "Réponses automatiques WhatsApp 24h/24",
               "Réponses premium closing",
               "Relance prospects intelligente",
               "Historique complet",
@@ -221,3 +222,4 @@ function FaqCard({ q, a }: { q: string; a: string }) {
     </Card>
   );
 }
+

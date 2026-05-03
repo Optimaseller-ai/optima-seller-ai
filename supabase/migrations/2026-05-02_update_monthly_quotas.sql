@@ -18,3 +18,9 @@ set quota_limit = 2000,
 where plan = 'pro'
   and (quota_limit is null or quota_limit < 2000);
 
+-- 3) Realtime + client sync needs RLS policies for usage_monthly writes/updates
+-- (so the app can keep the monthly counter correct).
+drop policy if exists usage_monthly_write_own on public.usage_monthly;
+drop policy if exists usage_monthly_update_own on public.usage_monthly;
+create policy "usage_monthly_write_own" on public.usage_monthly for insert with check (auth.uid() = user_id);
+create policy "usage_monthly_update_own" on public.usage_monthly for update using (auth.uid() = user_id);

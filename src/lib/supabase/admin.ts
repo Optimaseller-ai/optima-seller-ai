@@ -15,3 +15,12 @@ export function createAdminClient() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+export function createAdminClientSafe() {
+  try {
+    return createAdminClient();
+  } catch (e) {
+    console.error("createAdminClientSafe: admin client unavailable:", e);
+    return null;
+  }
+}

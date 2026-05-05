@@ -4,7 +4,13 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toaster";
 
-export function WhatsAppConnectClient({ connected }: { connected: boolean }) {
+export function WhatsAppConnectClient({
+  status,
+  phoneNumber,
+}: {
+  status: "connected" | "expired" | "error" | "disconnected";
+  phoneNumber: string | null;
+}) {
   const { toast } = useToast();
   const [connecting, setConnecting] = React.useState(false);
   const [disconnecting, setDisconnecting] = React.useState(false);
@@ -50,15 +56,21 @@ export function WhatsAppConnectClient({ connected }: { connected: boolean }) {
     }
   }
 
+  const isConnected = status === "connected";
+  const connectLabel = status === "expired" ? "Reconnecter mon WhatsApp" : "Connecter mon WhatsApp";
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={connect} disabled={connecting} className="shadow-sm">
-        {connecting ? "Connexion…" : "Connecter mon WhatsApp"}
+        {connecting ? "Connexion…" : connectLabel}
       </Button>
-      {connected ? (
-        <Button onClick={disconnect} disabled={disconnecting} variant="outline" className="bg-white">
-          {disconnecting ? "Déconnexion…" : "Déconnecter"}
-        </Button>
+      {isConnected ? (
+        <div className="flex items-center gap-2">
+          <div className="text-sm text-[var(--brand-navy)]/70">WhatsApp connecté ✅ {phoneNumber ? `(${phoneNumber})` : ""}</div>
+          <Button onClick={disconnect} disabled={disconnecting} variant="outline" className="bg-white">
+            {disconnecting ? "Déconnexion…" : "Déconnecter"}
+          </Button>
+        </div>
       ) : null}
     </div>
   );

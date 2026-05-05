@@ -18,13 +18,12 @@ const envSchema = z.object({
 
   // WhatsApp Cloud API (Meta)
   WHATSAPP_VERIFY_TOKEN: optionalTrimmed.pipe(z.string().min(1).optional()),
-  WHATSAPP_APP_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
   WHATSAPP_TOKEN_ENC_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
 
   // Meta OAuth / Embedded Signup
   META_APP_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
   META_APP_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
-  META_CONFIG_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
+  META_REDIRECT_URI: optionalTrimmed.pipe(z.string().url().optional()),
   META_OAUTH_STATE_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
 
   // Back-compat / quick-start single-tenant envs
@@ -45,12 +44,11 @@ export const env = envSchema.parse({
   LEEKPAY_PUBLIC_KEY: process.env.LEEKPAY_PUBLIC_KEY,
 
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
-  WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET,
   WHATSAPP_TOKEN_ENC_KEY: process.env.WHATSAPP_TOKEN_ENC_KEY,
 
   META_APP_ID: process.env.META_APP_ID,
   META_APP_SECRET: process.env.META_APP_SECRET,
-  META_CONFIG_ID: process.env.META_CONFIG_ID,
+  META_REDIRECT_URI: process.env.META_REDIRECT_URI,
   META_OAUTH_STATE_SECRET: process.env.META_OAUTH_STATE_SECRET,
 
   META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,

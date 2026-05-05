@@ -3,6 +3,8 @@
 
 -- Extensions
 create extension if not exists pgcrypto;
+create extension if not exists vector;
+create extension if not exists pg_trgm;
 
 -- Profiles (business memory)
 create table if not exists public.profiles (
@@ -121,6 +123,51 @@ create table if not exists public.whatsapp_connections (
   updated_at timestamptz not null default now(),
   unique (user_id),
   unique (phone_number_id)
+);
+
+-- Stable Meta OAuth integration storage (new flow)
+create table if not exists public.whatsapp_integrations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid unique references auth.users(id) on delete cascade,
+  meta_business_id text,
+  waba_id text,
+  phone_number_id text,
+  access_token_enc text not null default '',
+  access_token_iv text not null default '',
+  access_token_tag text not null default '',
+  phone_number text,
+  status text not null default 'disconnected',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.products (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  price numeric,
+  category text,
+  stock integer,
+  promo text,
+  description text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.documents (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  file_name text not null,
+  file_type text not null,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.document_chunks (
+  id uuid primary key default gen_random_uuid(),
+  document_id uuid not null references public.documents(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  content text not null,
+  embedding vector(1536)
 );
 
 create table if not exists public.customer_threads (

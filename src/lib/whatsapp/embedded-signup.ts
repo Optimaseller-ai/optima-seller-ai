@@ -12,8 +12,8 @@ export type MetaTokenExchangeResponse = {
 export function requireMetaEnv() {
   if (!env.META_APP_ID) throw new Error("Missing env META_APP_ID.");
   if (!env.META_APP_SECRET) throw new Error("Missing env META_APP_SECRET.");
-  if (!env.META_CONFIG_ID) throw new Error("Missing env META_CONFIG_ID.");
-  if (!env.WHATSAPP_VERIFY_TOKEN && !env.META_VERIFY_TOKEN) throw new Error("Missing env WEBHOOK_VERIFY_TOKEN (WHATSAPP_VERIFY_TOKEN or META_VERIFY_TOKEN).");
+  if (!env.META_REDIRECT_URI) throw new Error("Missing env META_REDIRECT_URI.");
+  if (!env.WHATSAPP_VERIFY_TOKEN) throw new Error("Missing env WHATSAPP_VERIFY_TOKEN.");
   if (!env.WHATSAPP_TOKEN_ENC_KEY) throw new Error("Missing env WHATSAPP_TOKEN_ENC_KEY.");
 }
 
@@ -49,8 +49,6 @@ export function buildEmbeddedSignupUrl(opts: { redirectUri: string; signedState:
   u.searchParams.set("redirect_uri", opts.redirectUri);
   u.searchParams.set("state", opts.signedState);
   u.searchParams.set("response_type", "code");
-  // Embedded Signup: config_id is required to launch WhatsApp onboarding flow
-  u.searchParams.set("config_id", env.META_CONFIG_ID!);
   // Scopes needed to manage WABA + phone numbers + subscribe apps
   u.searchParams.set("scope", "business_management,whatsapp_business_management,whatsapp_business_messaging");
   return u.toString();
@@ -92,39 +90,71 @@ export type DiscoveredWhatsApp = {
   businessId: string | null;
   wabaId: string | null;
   phoneNumberId: string | null;
-  displayPhoneNumber: string | null;
-  verifiedName: string | null;
+  phoneNumber: string | null;
 };
 
 export async function discoverWabaAndPhone(opts: { accessToken: string }): Promise<DiscoveredWhatsApp> {
-  // Best-effort discovery: depends on permissions granted during signup.
-  const url = new URL("https://graph.facebook.com/v23.0/me");
-  url.searchParams.set(
-    "fields",
-    [
-      "id",
-      "whatsapp_business_accounts{",
-      "id,name,phone_numbers{id,display_phone_number,verified_name}",
-      "}",
-    ].join(""),
-  );
-  url.searchParams.set("access_token", opts.accessToken);
-  const resp = await fetch(url.toString(), { method: "GET" });
-  const json = (await resp.json().catch(() => ({}))) as any;
-  if (!resp.ok) {
-    const msg = typeof json?.error?.message === "string" ? json.error.message : `Meta discovery failed (HTTP ${resp.status})`;
+  // Official flow:
+  // 1) /me/businesses
+  // 2) /{business_id}/owned_whatsapp_business_accounts
+  // 3) /{waba_id}/phone_numbers
+  const headers = {
+    Authorization: `Bearer ${opts.accessToken}`,
+  };
+
+  // 1) businesses
+  const businessesResp = await fetch("https://graph.facebook.com/v19.0/me/businesses", { method: "GET", headers });
+  const businessesJson = (await businessesResp.json().catch(() => ({}))) as any;
+  console.log("Meta discovery: businesses", { status: businessesResp.status, ok: businessesResp.ok, json: businessesJson });
+  if (!businessesResp.ok) {
+    const msg =
+      typeof businessesJson?.error?.message === "string"
+        ? businessesJson.error.message
+        : `Meta discovery businesses failed (HTTP ${businessesResp.status})`;
     throw new Error(msg);
   }
 
-  const businessId = typeof json?.id === "string" ? json.id : null;
-  const waba = json?.whatsapp_business_accounts?.data?.[0] ?? null;
-  const wabaId = typeof waba?.id === "string" ? waba.id : null;
-  const phone = waba?.phone_numbers?.data?.[0] ?? null;
-  const phoneNumberId = typeof phone?.id === "string" ? phone.id : null;
-  const displayPhoneNumber = typeof phone?.display_phone_number === "string" ? phone.display_phone_number : null;
-  const verifiedName = typeof phone?.verified_name === "string" ? phone.verified_name : null;
+  const businessId = typeof businessesJson?.data?.[0]?.id === "string" ? String(businessesJson.data[0].id) : null;
+  if (!businessId) throw new Error("Aucun Business trouvé sur votre compte Meta. Vérifiez l'accès Business Manager.");
 
-  return { businessId, wabaId, phoneNumberId, displayPhoneNumber, verifiedName };
+  // 2) owned WhatsApp Business Accounts
+  const wabaResp = await fetch(
+    `https://graph.facebook.com/v19.0/${encodeURIComponent(businessId)}/owned_whatsapp_business_accounts`,
+    { method: "GET", headers },
+  );
+  const wabaJson = (await wabaResp.json().catch(() => ({}))) as any;
+  console.log("Meta discovery: owned_whatsapp_business_accounts", { status: wabaResp.status, ok: wabaResp.ok, json: wabaJson });
+  if (!wabaResp.ok) {
+    const msg =
+      typeof wabaJson?.error?.message === "string"
+        ? wabaJson.error.message
+        : `Meta discovery WABA failed (HTTP ${wabaResp.status})`;
+    throw new Error(msg);
+  }
+
+  const wabaId = typeof wabaJson?.data?.[0]?.id === "string" ? String(wabaJson.data[0].id) : null;
+  if (!wabaId) throw new Error("Aucun WhatsApp Business Account (WABA) trouvé. Vérifiez votre configuration WhatsApp Business.");
+
+  // 3) phone numbers
+  const phoneResp = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(wabaId)}/phone_numbers`, {
+    method: "GET",
+    headers,
+  });
+  const phoneJson = (await phoneResp.json().catch(() => ({}))) as any;
+  console.log("Meta discovery: phone_numbers", { status: phoneResp.status, ok: phoneResp.ok, json: phoneJson });
+  if (!phoneResp.ok) {
+    const msg =
+      typeof phoneJson?.error?.message === "string"
+        ? phoneJson.error.message
+        : `Meta discovery phone_numbers failed (HTTP ${phoneResp.status})`;
+    throw new Error(msg);
+  }
+
+  const phoneNumberId = typeof phoneJson?.data?.[0]?.id === "string" ? String(phoneJson.data[0].id) : null;
+  const phoneNumber = typeof phoneJson?.data?.[0]?.display_phone_number === "string" ? String(phoneJson.data[0].display_phone_number) : null;
+  if (!phoneNumberId) throw new Error("Aucun numéro WhatsApp trouvé. Ajoutez un numéro dans WhatsApp Manager puis réessayez.");
+
+  return { businessId, wabaId, phoneNumberId, phoneNumber };
 }
 
 export async function subscribeAppToWaba(opts: { accessToken: string; wabaId: string }) {

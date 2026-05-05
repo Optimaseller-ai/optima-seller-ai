@@ -1,0 +1,18 @@
+
+> optima-seller-ai@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+- Environments: .env.local
+✓ Ready in 2.1s
+  Skipping creating a lockfile at C:\Users\yuri\Documents\Codex\2026-05-01\rend-toi-l-adresse-c-users\optima\.next\dev\lock because we're using WASM bindings
+- Experiments (use with caution):
+  · optimizePackageImports
+  ✓ useWasmBinary
+
+○ Compiling / ...
+ GET / 200 in 4.0s (next.js: 3.3s, application-code: 717ms)
+ GET / 200 in 96ms (next.js: 6ms, application-code: 90ms)
+[?25h

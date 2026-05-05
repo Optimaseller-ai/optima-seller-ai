@@ -9,8 +9,8 @@ export type WhatsAppTextMessage = {
 };
 
 export function verifyMetaSignature(rawBody: string, signature256: string | null) {
-  const secret = env.WHATSAPP_APP_SECRET;
-  if (!secret) throw new Error("Missing env WHATSAPP_APP_SECRET.");
+  const secret = env.META_APP_SECRET;
+  if (!secret) throw new Error("Missing env META_APP_SECRET.");
   if (!signature256) return false;
   // Expected: "sha256=<hex>"
   const [alg, sig] = signature256.split("=", 2);

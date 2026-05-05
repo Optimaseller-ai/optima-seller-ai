@@ -1,7 +1,6 @@
 import "server-only";
 
 import crypto from "node:crypto";
-import { env } from "@/lib/env";
 
 function getKey() {
   const raw = (process.env.WHATSAPP_TOKEN_ENC_KEY ?? "").trim();
@@ -38,4 +37,3 @@ export function decryptSecret(payload: EncryptedSecret): string {
   const out = Buffer.concat([decipher.update(data), decipher.final()]);
   return out.toString("utf8");
 }
-

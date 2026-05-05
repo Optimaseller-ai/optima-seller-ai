@@ -14,3 +14,20 @@ alter table public.whatsapp_connections
   add column if not exists last_error text;
 
 create index if not exists whatsapp_connections_status_idx on public.whatsapp_connections (status);
+
+-- New simplified integration table (Meta Embedded Signup only)
+-- Keep existing whatsapp_connections for backward-compat, but new code uses whatsapp_integrations.
+
+create table if not exists public.whatsapp_integrations (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  access_token_enc text not null default '',
+  access_token_iv text not null default '',
+  access_token_tag text not null default '',
+  phone_number_id text,
+  business_id text,
+  phone_number text,
+  status text not null default 'disconnected',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists whatsapp_integrations_phone_number_id_idx on public.whatsapp_integrations (phone_number_id);

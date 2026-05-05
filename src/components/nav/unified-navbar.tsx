@@ -157,6 +157,9 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
                     <Link href="/app/whatsapp">WhatsApp IA</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/app/catalog">Catalogue</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/pricing">Tarifs</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -198,6 +201,9 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/app/whatsapp">WhatsApp IA</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/app/catalog">Catalogue</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild className={cn(proDisabled ? "pointer-events-none opacity-70" : undefined)}>
                     <Link href="/pricing">{proLabel}</Link>

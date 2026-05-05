@@ -19,4 +19,3 @@ export const serverEnv = serverEnvSchema.parse({
   OPENROUTER_SITE_URL: process.env.OPENROUTER_SITE_URL,
   OPENROUTER_APP_NAME: process.env.OPENROUTER_APP_NAME,
 });
-

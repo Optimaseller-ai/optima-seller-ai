@@ -1,6 +1,5 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-
 const { isWhoAmIIntent, formatWhoAmIResponse } = require("../src/lib/ai/whoami");
 
 test("isWhoAmIIntent matches common variants and typos", () => {
@@ -27,6 +26,6 @@ test("formatWhoAmIResponse uses profile fields when present", () => {
   });
 
   assert.match(message, /Vous êtes Yuri\./);
-  assert.match(message, /Votre business s’appelle Optima à Libreville\./);
+  assert.match(message, /Votre business s['’]appelle Optima à Libreville\./);
   assert.match(message, /Offre : IA pour vendeurs WhatsApp\./);
 });

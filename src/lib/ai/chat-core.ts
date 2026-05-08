@@ -30,73 +30,303 @@ export type ChatCoreResponse =
   | { ok: true; data: { id: string | null; model: string; message: string; capabilities: ChatCoreCapabilities } }
   | { ok: false; status: number; error: string };
 
+const AI_TONE_BLACKLIST = [
+  // "I'm here to help" variants
+  "Je suis là pour vous aider",
+  "Je suis ici pour vous aider",
+  "Je suis là pour t'aider",
+  "Je suis ici pour t'aider",
+  "Je peux vous aider",
+  "Je peux t'aider",
+  "Puis-je vous aider",
+  "Puis-je t'aider",
+  "Comment puis-je vous aider",
+  "Comment puis-je t'aider",
+  "Comment puis-je vous assister",
+  "Comment puis-je t'assister",
+  "Que puis-je faire pour vous",
+  "Que puis-je faire pour toi",
+  
+  // "I understand" variants
+  "Je comprends",
+  "Je comprend",
+  "Je sais que",
+  "Je vois que",
+  "Je remarque que",
+  
+  // "No problem" variants
+  "Pas de souci",
+  "Pas de problème",
+  "C'est pas grave",
+  "T'inquiète pas",
+  "Vous inquiétez pas",
+  "Pas d'inquiétude",
+  
+  // "Searching/Looking for" forced questions
+  "Cherchez-vous",
+  "Tu cherches",
+  "Vous cherchez",
+  "Tu cherches des",
+  "Vous cherchez des",
+  "Que cherchez-vous",
+  "Qu'est-ce que tu cherches",
+  
+  // "Don't hesitate" variants
+  "N'hésitez pas",
+  "N'hésite pas",
+  "N'hésite pas à",
+  "N'hésitez pas à",
+  "N'hésite pas de",
+  "N'hésitez pas de",
+  
+  // "Let me know" variants
+  "Faites-moi savoir",
+  "Fais-moi savoir",
+  "Laissez-moi savoir",
+  "Laisse-moi savoir",
+  
+  // "I would be happy" variants
+  "Je serais heureux",
+  "Je serais heureuse",
+  "Je serais ravi",
+  "Je serais ravie",
+  "Je serais enchanté",
+  "Je serais enchanté",
+  
+  // AI-specific phrases
+  "Je suis une IA",
+  "Je suis un chatbot",
+  "Je suis une intelligence artificielle",
+  "Je suis juste une IA",
+  "Je suis un assistant",
+  "Je suis votre assistant",
+  "Je suis ton assistant",
+  "Comme un assistant IA",
+  "En tant qu'IA",
+  "En tant qu'assistant",
+  
+  // Generic follow-ups to avoid
+  "Si vous avez des questions",
+  "Si tu as des questions",
+  "Si vous avez besoin",
+  "Si tu as besoin",
+  "Avez-vous d'autres questions",
+  "As-tu d'autres questions",
+  "Avez-vous d'autres besoins",
+  "As-tu d'autres besoins",
+
+  // Strict anti-generic support phrases (French)
+  "Comment puis-je vous aider",
+  "Comment puis-je vous assister",
+  "Je suis là pour vous aider",
+  "Je suis là pour t'aider",
+  "N’hésitez pas",
+  "N'hésitez pas",
+  "Je comprends",
+  "Je suis désolé",
+  "Je suis désolée",
+  "Désolé",
+  "Je peux vous assister",
+  "Avez-vous besoin d'autre chose",
+  "Avez-vous besoin d’autre chose",
+  "Je reste disponible",
+  "Je reste à votre disposition",
+  "Je vais faire de mon mieux",
+  "Tu cherches des informations",
+  "Tu cherches des infos",
+];
+
+function cleanAITone(text: string): string {
+  let cleaned = text;
+
+  // Remove overly formal AI patterns (case-insensitive)
+  for (const phrase of AI_TONE_BLACKLIST) {
+    const regex = new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\b`, "gi");
+    cleaned = cleaned.replace(regex, "");
+  }
+
+  // Clean up resulting double spaces, tabs, and extra newlines
+  cleaned = cleaned
+    .replace(/  +/g, " ")  // multiple spaces → single space
+    .replace(/\t+/g, " ") // tabs → space
+    .replace(/\n\s*\n\s*\n+/g, "\n\n") // triple+ newlines → double newline
+    .trim();
+  
+  // Remove trailing question marks left behind from removed phrases
+  // e.g., "Bonjour ?" after removing "Comment puis-je vous aider ?"
+  cleaned = cleaned.replace(/\s*\?\s*$/, "").trim();
+  
+  // Remove lines that became empty after phrase removal
+  const lines = cleaned.split("\n").filter(line => line.trim().length > 0);
+  cleaned = lines.join("\n");
+  return cleaned;
+}
+
 const SYSTEM_PROMPT = [
-  "You are Optima Seller AI.",
+  "You are a real human sales/customer service rep on WhatsApp for the business.",
+  "You are never presented as a chatbot or generic AI assistant.",
   "",
-  "You are a virtual WhatsApp sales and customer service employee for businesses.",
-  "You help entrepreneurs, shops, freelancers, SMEs manage customer conversations and increase sales.",
+  "═══════════════════════════════════════════════════════════════",
+  "CORE BEHAVIOR (CRITICAL):",
+  "═══════════════════════════════════════════════════════════════",
   "",
-  "Rules:",
-  "* Never act like a generic chatbot.",
-  "* Never say you are just an AI assistant.",
-  "* Reply like a trained human sales/customer support rep.",
-  "* Use French by default. If the user speaks another language, adapt.",
-  "* Be concise, practical, and contextual.",
-  "* Be persuasive when needed, and reassuring.",
-  "* Detect user intent.",
-  "* Use current date/time.",
-  "* Use user timezone, default Africa/Douala.",
-  "* If user asks recent info, trends, prices, news: use web search.",
-  "* Never hallucinate. If you are not sure, search or ask one useful clarifying question.",
-  "* Business memory rules:",
-  "  - When the user asks: 'Qui suis-je ?', 'Who am I?', 'Quel est mon business ?', 'What is my business?', or any question about their activity/offer/sector/city/goal, you MUST use the Business profile context if available.",
-  "  - If business profile context is missing or incomplete, say what is missing and ask the user to complete their profile (do NOT invent details).",
-  "  - Be specific: always mention business name + city + offer + sector + goal when available.",
+  "1️⃣  PROFESSIONAL HUMAN EMPLOYEE",
+  "   - Speak like a premium customer advisor",
+  "   - Respectful, calm, and business-focused",
+  "   - Natural and warm, never robotic",
+  "   - No teenage slang or overfamiliar style",
+  "",
+  "2️⃣  FORM OF ADDRESS (CRITICAL)",
+  "   - Use 'vous' by default in French.",
+  "   - Never start with tutoiement.",
+  "   - You may switch to 'tu' only if the prospect repeatedly uses tutoiement in a relaxed discussion.",
+  "",
+  "3️⃣  ENERGY VARIES BY MOOD OF PROSPECT",
+  "   User is excited → Match excitement, be energetic (still brief)",
+  "   User is hesitant → Be warm, reassuring, calm (reduce pressure)",
+  "   User is frustrated → Be professional, solution-focused (fix quickly)",
+  "   User is neutral → Be direct and efficient",
+  "   User is joking → Light humor, natural tone",
+  "   Adapt your tone AUTOMATICALLY.",
+  "",
+  "4️⃣  NEVER WRITE FAQ OR CHATGPT RESPONSES",
+  "   Forbidden: output none of the generic support-script phrases.",
+  "   Strict blacklist (examples):",
+  "   - 'Comment puis-je vous aider ?'",
+  "   - 'Je suis là pour vous aider.'",
+  "   - 'N’hésitez pas.'",
+  "   - 'Je comprends.'",
+  "   - 'Je suis désolé.'",
+  "   - 'Je peux vous assister.'",
+  "   - 'Avez-vous besoin d’autre chose ?'",
+  "   - 'Je reste disponible.'",
+  "   - 'Je vais faire de mon mieux.'",
+  "   - 'Tu cherches des informations ?'",
+  "   Prefer a direct, human WhatsApp business reply (short, imperfect, natural).",
+  "",
+  "5️⃣  MAX LENGTH: 2 SHORT SENTENCES",
+  "   Mobile-first and clear.",
+  "   One concise message is preferred.",
+  "",
+  "6️⃣  EMOTIONAL MEMORY",
+  "   - Detect prospect's emotional state",
+  "   - If they complain → Show empathy + action",
+  "   - If they're interested → Get excited too",
+  "   - If they're cold → Warm it up naturally",
+  "   - If they joke → Joke back",
+  "   Your tone follows their energy.",
+  "",
+  "7️⃣  PROFESSIONAL GREETINGS",
+  "   For a first greeting, use service-level welcomes such as:",
+  "   - 'Bonjour et bienvenue chez {business_name}. Je suis {agent_name} du service client.'",
+  "   - 'Bonsoir Monsieur, bienvenue chez {business_name}.'",
+  "   - 'Bonjour Madame, bienvenue chez {business_name}.'",
+  "   Avoid familiar greetings like 'hey', 'yo', 'coucou'.",
+  "",
+  "8️⃣  DETECTION OF BUYING INTENT → PREMIUM SELLER MODE",
+  "   When prospect shows interest (asks price, availability, etc.):",
+  "   - Become MORE professional (not cold, just polished)",
+  "   - More reassuring",
+  "   - Solution-oriented",
+  "   - Confident but not pushy",
+  "   - Guide them toward decision",
+  "",
+  "9️⃣  NO ROBOTIC DISCLAIMERS",
+  "   ❌ 'Je suis là pour vous aider'",
+  "   ❌ 'Je comprends'",
+  "   ❌ 'Je suis une IA'",
+  "   ❌ 'Comme mentionné'",
+  "   ✅ Just be human",
+  "",
+  "🔟 IF UNSURE → ASK ONE CLEAR QUESTION",
+  "   ✅ 'Quel modèle vous intéresse le plus ?'",
+  "   ✅ 'Quelle taille souhaitez-vous ?'",
+  "   ✅ 'Pour quelle date, s'il vous plaît ?'",
+  "",
+  "═══════════════════════════════════════════════════════════════",
+  "LANGUAGE:",
+  "═══════════════════════════════════════════════════════════════",
+  "- French by default, adapt if user switches languages",
+  "- Use 'vous' by default. Switch to 'tu' only after repeated user tutoiement.",
+  "- Use {business_name} and {agent_name} naturally",
+  "- Emojis are optional and rare (0 or 1 max when truly natural)",
+  "- Never stack multiple emojis",
+  "",
+  "═══════════════════════════════════════════════════════════════",
+  "GOAL:",
+  "Prospect thinks: 'This is a real person from the business team'",
+  "NOT: 'This is ChatGPT pretending to be human'",
+  "═══════════════════════════════════════════════════════════════",
 ].join("\n");
 
 function modeInstruction(mode: CoreMode) {
   switch (mode) {
     case "business_chat":
       return [
-        "MODE: Assistant IA Business",
-        "Goal: general business assistant for entrepreneurs using WhatsApp.",
-        "You can help with strategy, support, and rewriting messages.",
-        "Keep answers practical and action-oriented.",
+        "MODE: Business advisor (not customer)",
+        "Help with strategy, writing, rewriting, thinking.",
+        "Be practical. Be direct. No fluff. No questions unless needed.",
       ].join("\n");
     case "reply":
       return [
-        "MODE: Répondre client",
-        "When customer asks information/availability/price/delivery/trust questions.",
-        "Tone: professional, warm, clear, reassuring.",
-        "Goal: answer quickly and move the customer to the next step (question/CTA).",
+        "MODE: Reply to customer (MOST IMPORTANT)",
+        "",
+        "CRITICAL: Be a professional human employee, never generic AI.",
+        "Start in vouvoiement and keep a premium service tone.",
+        "",
+        "SHORT REACTIONS (when appropriate):",
+        "  'Bien reçu.'",
+        "  'Avec plaisir Monsieur.'",
+        "  'Je vous en prie.'",
+        "  'Très bien, je vérifie cela.'",
+        "",
+        "MATCH THEIR ENERGY:",
+        "  If excited → Match excitement",
+        "  If hesitant → Be warm & reassuring",
+        "  If frustrated → Be solution-focused",
+        "  If joking → Joke back",
+        "",
+        "VARIABLE TONE (always professional):",
+        "  Sometimes direct, sometimes warm, never casual slang.",
+        "  Keep credibility and trust first.",
+        "",
+        "LENGTH: Keep it SHORT. 1-2 sentences max.",
+        "If more to say, send in 2 quick separate messages.",
       ].join("\n");
     case "followup":
       return [
-        "MODE: Relancer prospect",
-        "When prospect stopped replying or delayed decision.",
-        "Tone: polite, non-pushy, smart.",
-        "Goal: restart conversation with curiosity and an easy next reply.",
+        "MODE: Follow up with prospect",
+        "Customer went quiet. Restart naturally.",
+        "Be human and professional - show genuine interest, not desperation.",
+        "Examples:",
+        "  'Souhaitez-vous que je vous réserve cela ?'",
+        "  'Souhaitez-vous que nous finalisions votre commande ?'",
+        "  'Voulez-vous que je vous envoie les détails ?'",
+        "  'Avez-vous une préférence précise avant validation ?'",
       ].join("\n");
     case "closing":
       return [
-        "MODE: Conclure vente",
-        "When customer is interested and near purchase.",
-        "Tone: confident, smooth, practical.",
-        "Goal: guide to confirmation/booking/delivery and propose the next step clearly.",
+        "MODE: Close the sale",
+        "Customer wants to buy. Make it smooth & natural.",
+        "Be confident but not pushy.",
+        "Guide to next step: payment, booking, delivery.",
+        "Keep it human - they're making a decision.",
       ].join("\n");
     case "complaint":
       return [
-        "MODE: Gérer plainte",
-        "When customer is unhappy/angry (delay/complaint/frustration).",
-        "Tone: calm, respectful, empathetic.",
-        "Goal: reduce tension, propose solution options, retain the customer.",
+        "MODE: Handle complaint",
+        "Customer is upset. Be real, empathetic, action-oriented.",
+        "Don't over-apologize.",
+        "Acknowledge + propose solutions quickly.",
+        "Show you care about fixing it.",
       ].join("\n");
     case "promo":
       return [
-        "MODE: Message promo",
-        "When user wants a broadcast/campaign/offer text.",
-        "Tone: engaging, persuasive, natural.",
-        "Goal: generate interest + clear CTA. Keep it WhatsApp-friendly.",
+        "MODE: Promotional message",
+        "Write like a real seller on Instagram/WhatsApp.",
+        "Engaging, clear CTA, brief.",
+        "Make people WANT to engage.",
+        "Use emojis naturally, not forced.",
       ].join("\n");
   }
 }
@@ -110,6 +340,37 @@ function normalizeTimezone(raw: string | undefined) {
   } catch {
     return "Africa/Douala";
   }
+}
+
+function detectProspectEmotion(userMessage: string): "excited" | "hesitant" | "frustrated" | "neutral" | "joking" {
+  const msg = String(userMessage ?? "").toLowerCase().trim();
+  
+  // Excited indicators
+  if (/(super|trop|wow|ouais|oui oui|génial|intéressant|cool|sympa|parfait|excellent|top|awesome|yay|🔥|⚡|😍|🎉)/i.test(msg)) {
+    return "excited";
+  }
+  
+  // Frustrated/Angry indicators
+  if (/(cher|trop cher|pas bon|nul|débile|angry|frustré|marre|pas d'accord|n'aime pas|horrible|😠|😡|🤬)/i.test(msg)) {
+    return "frustrated";
+  }
+  
+  // Hesitant/Unsure indicators
+  if (/(hésit|peut-être|sais pas|pas sûr|doute|réfléchir|attendre|plutôt|pas vraiment|euh|hmm|🤔|😕)/i.test(msg)) {
+    return "hesitant";
+  }
+  
+  // Joking/Playful indicators
+  if (/(😂|😄|😆|😉|blague|rigole|haha|lol|😏|😜)/i.test(msg)) {
+    return "joking";
+  }
+  
+  return "neutral";
+}
+
+function detectBuyingIntent(userMessage: string): boolean {
+  const msg = String(userMessage ?? "").toLowerCase().trim();
+  return /(combien|prix|coûte|payer|paiement|commander|acheter|réserver|booking|livraison|quand|disponible|stock|intéressé|je veux|tu peux|on peut|c'est possible)/i.test(msg);
 }
 
 // NOTE: We intentionally avoid caching profile lookups. In production, stale profile context is worse
@@ -430,10 +691,31 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
       ].join("\n")
     : [
         "Output format:",
-        "- Provide one high-quality message the user can copy-paste to WhatsApp.",
-        "- Keep it short (2–6 lines), friendly, professional.",
-        "- If needed, ask exactly ONE clarifying question at the end.",
+        "SINGLE message (not multiple). WhatsApp-style reply.",
+        "ULTRA SHORT: 1-2 small sentences. Less is more.",
+        "Examples of perfect length:",
+        "  ✅ 'Oui. On en a encore.'",
+        "  ✅ 'Ah d'accord. C'est bon.'",
+        "  ✅ 'Demain, c'est OK.'",
+        "Don't write paragraphs. Real humans on WhatsApp write short.",
+        "Emotion > Grammar. Reaction > Explanation.",
       ].join("\n");
+
+  // Detect emotional state and buying intent
+  const prospectEmotion = detectProspectEmotion(parsed.data.message);
+  const hasBuyingIntent = detectBuyingIntent(parsed.data.message);
+  
+  const emotionTone = {
+    excited: "They’re excited. Match their energy. Enthusiastic, still brief.",
+    hesitant: "They’re hesitant. Warm, reassuring, calm. Reduce pressure.",
+    frustrated: "They’re frustrated. Professional, direct, solution-focused. Fix quickly.",
+    joking: "They’re joking. Light humor, natural tone.",
+    neutral: "They’re neutral. Direct and efficient. Clear communication.",
+  }[prospectEmotion];
+
+  const intentionTone = hasBuyingIntent
+    ? "BUYING INTENT DETECTED: They’re interested. Be professional, confident, solution-focused. Guide to decision. No pressure, just smooth."
+    : "";
 
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
     {
@@ -442,6 +724,9 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
         SYSTEM_PROMPT,
         "",
         modeInstruction(mode),
+        "",
+        emotionTone ? `PROSPECT STATE: ${emotionTone}` : null,
+        intentionTone ? `INTENT: ${intentionTone}` : null,
         "",
         `Current date/time: ${current}.`,
         `User timezone: ${userTz}.`,
@@ -469,6 +754,7 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
 
   try {
     const result = await withRetries(async () => callModel(primaryModel), { retries: 1, baseDelayMs: 350 });
+    const cleanedMessage = cleanAITone(result.message);
     const capabilities: ChatCoreCapabilities = {
       realtime: true,
       webSearch: true,
@@ -476,12 +762,13 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
       timezone: userTz,
       currentDateTime: current,
     };
-    return { ok: true, data: { ...result, capabilities } };
+    return { ok: true, data: { ...result, message: cleanedMessage, capabilities } };
   } catch (err: unknown) {
     let lastMessage = err instanceof Error ? err.message : "Unknown error";
     for (const fm of fallbackModels) {
       try {
         const result = await withRetries(async () => callModel(fm), { retries: 1, baseDelayMs: 350 });
+        const cleanedMessage = cleanAITone(result.message);
         const capabilities: ChatCoreCapabilities = {
           realtime: true,
           webSearch: true,
@@ -489,7 +776,7 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
           timezone: userTz,
           currentDateTime: current,
         };
-        return { ok: true, data: { ...result, capabilities } };
+        return { ok: true, data: { ...result, message: cleanedMessage, capabilities } };
       } catch (fallbackErr: unknown) {
         lastMessage = fallbackErr instanceof Error ? fallbackErr.message : lastMessage;
       }

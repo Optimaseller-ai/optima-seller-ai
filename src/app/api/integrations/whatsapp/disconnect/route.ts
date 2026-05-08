@@ -9,18 +9,22 @@ export async function POST() {
 
   const admin = createAdminClient();
   const { error } = await admin
-    .from("whatsapp_integrations")
+    .from("whatsapp_connections")
     .upsert(
       {
         user_id: data.user.id,
         status: "disconnected",
-        phone_number_id: null,
-        meta_business_id: null,
+        last_error: null,
+        phone_number_id: "",
+        business_account_id: null,
+        token_enc: "",
+        token_iv: "",
+        token_tag: "",
+        token_expires_at: null,
         waba_id: null,
-        phone_number: null,
-        access_token_enc: "",
-        access_token_iv: "",
-        access_token_tag: "",
+        business_id: null,
+        display_phone_number: null,
+        verified_name: null,
         updated_at: new Date().toISOString(),
       } as any,
       { onConflict: "user_id" },
@@ -29,3 +33,4 @@ export async function POST() {
   if (error) return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
+

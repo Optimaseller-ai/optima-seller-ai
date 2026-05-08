@@ -43,18 +43,30 @@ export function isSubscriptionActive(sub: SubscriptionRow | null) {
   return dt.isValid ? dt.toUTC() > DateTime.utc() : true;
 }
 
+function extractSessionUserId(sessionData: unknown): string | null {
+  if (!sessionData || typeof sessionData !== "object") return null;
+  const session = (sessionData as { session?: unknown }).session;
+  if (!session || typeof session !== "object") return null;
+  const user = (session as { user?: unknown }).user;
+  if (!user || typeof user !== "object") return null;
+  const id = (user as { id?: unknown }).id;
+  return typeof id === "string" && id ? id : null;
+}
+
+function extractAuthUserId(authData: unknown): string | null {
+  if (!authData || typeof authData !== "object") return null;
+  const user = (authData as { user?: unknown }).user;
+  if (!user || typeof user !== "object") return null;
+  const id = (user as { id?: unknown }).id;
+  return typeof id === "string" && id ? id : null;
+}
+
 export function useSubscription(): UseSubscriptionState {
   const [loading, setLoading] = React.useState(true);
   const [userId, setUserId] = React.useState<string | null>(null);
   const [subscription, setSubscription] = React.useState<SubscriptionRow | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const channelSuffix = React.useMemo(() => {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    }
-  }, []);
+  const channelSuffix = React.useId();
 
   const refresh = React.useCallback(async () => {
     const supabase = createOptionalSupabaseClient();
@@ -69,12 +81,11 @@ export function useSubscription(): UseSubscriptionState {
     setLoading(true);
     try {
       // Fast-path: resolve a session locally (cookie/localStorage) before calling getUser().
-      const { data: sessionData } = await authGetSessionCoalesced(supabase as any);
-      const sessionUserId =
-        (sessionData as any)?.session?.user?.id ? String((sessionData as any).session.user.id) : null;
+      const { data: sessionData } = await authGetSessionCoalesced(supabase);
+      const sessionUserId = extractSessionUserId(sessionData);
 
       const { data: auth } = await authGetUserCoalesced(supabase);
-      const effectiveUserId = (auth as any)?.user?.id ? String((auth as any).user.id) : sessionUserId;
+      const effectiveUserId = extractAuthUserId(auth) ?? sessionUserId;
       if (!effectiveUserId) {
         setUserId(null);
         setSubscription(null);
@@ -85,13 +96,15 @@ export function useSubscription(): UseSubscriptionState {
 
       const { data: row, error: dbErr } = await supabase
         .from("subscriptions")
-        .select("user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at")
+        .select(
+          "user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at",
+        )
         .eq("user_id", effectiveUserId)
         .maybeSingle();
 
       if (dbErr) throw dbErr;
 
-      let next = row ? normalizeSub(row as any) : null;
+      let next = row ? normalizeSub(row as Record<string, unknown>) : null;
 
       if (!row) {
         const payload = {
@@ -105,10 +118,12 @@ export function useSubscription(): UseSubscriptionState {
         const { data: created, error: createErr } = await supabase
           .from("subscriptions")
           .upsert(payload, { onConflict: "user_id" })
-          .select("user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at")
+          .select(
+            "user_id,plan,quota_limit,quota_used,expires_at,subscription_status,pro_since,payment_provider,payment_reference,created_at,updated_at",
+          )
           .maybeSingle();
         if (createErr) throw createErr;
-        next = created ? normalizeSub(created as any) : null;
+        next = created ? normalizeSub(created as Record<string, unknown>) : null;
       }
 
       // Ensure quota_used reflects the current month (usage_monthly is source of truth).
@@ -142,15 +157,26 @@ export function useSubscription(): UseSubscriptionState {
 
       setSubscription(next);
       setError(null);
-    } catch (err: any) {
-      setError(typeof err?.message === "string" ? err.message : "Erreur abonnement.");
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "message" in err && typeof (err as { message?: unknown }).message === "string") {
+        setError((err as { message: string }).message);
+      } else {
+        setError("Erreur abonnement.");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    void refresh();
+    let canceled = false;
+    void Promise.resolve().then(async () => {
+      if (canceled) return;
+      await refresh();
+    });
+    return () => {
+      canceled = true;
+    };
   }, [refresh]);
 
   React.useEffect(() => {
@@ -164,9 +190,9 @@ export function useSubscription(): UseSubscriptionState {
         "postgres_changes",
         { event: "*", schema: "public", table: "subscriptions", filter: `user_id=eq.${userId}` },
         (payload) => {
-          const next = (payload.new ?? payload.old) as any;
-          if (!next) return;
-          setSubscription(normalizeSub(next));
+          const next = (payload.new ?? payload.old) as unknown;
+          if (!next || typeof next !== "object") return;
+          setSubscription(normalizeSub(next as Record<string, unknown>));
         },
       )
       .subscribe();
@@ -190,10 +216,11 @@ export function useSubscription(): UseSubscriptionState {
         "postgres_changes",
         { event: "*", schema: "public", table: "usage_monthly", filter: `user_id=eq.${userId}` },
         (payload) => {
-          const next = (payload.new ?? payload.old) as any;
-          if (!next) return;
-          if (String(next.period_start ?? "") !== String(periodStart)) return;
-          const usedThisMonth = typeof next.used === "number" ? next.used : 0;
+          const next = (payload.new ?? payload.old) as unknown;
+          if (!next || typeof next !== "object") return;
+          const nextRow = next as Record<string, unknown>;
+          if (String(nextRow.period_start ?? "") !== String(periodStart)) return;
+          const usedThisMonth = typeof nextRow.used === "number" ? nextRow.used : 0;
           setSubscription((prev) => (prev ? { ...prev, quota_used: usedThisMonth } : prev));
         },
       )

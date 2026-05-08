@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ToastProvider, Toaster } from "@/components/ui/toaster";
@@ -15,7 +15,7 @@ function getMetadataBase() {
   return new URL("http://localhost:3000");
 }
 
-const geistSans = Geist({
+const jakarta = Plus_Jakarta_Sans({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -41,7 +41,7 @@ export default function RootLayout({
     <html
       lang="fr"
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
@@ -57,6 +57,7 @@ export default function RootLayout({
             })();
           `}
         </Script>
+        <div className="optima-bg" aria-hidden="true" />
         <ToastProvider>
           {children}
           <Toaster />

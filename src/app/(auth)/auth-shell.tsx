@@ -33,7 +33,7 @@ export function AuthShell({
 
             <div className="mt-8 space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight text-[var(--brand-navy)]">
-                Votre assistant IA pour vendre sur WhatsApp
+                Votre assistant IA pour vendre
               </h1>
               <p className="text-[var(--brand-navy)]/70">
                 Répondez vite, rassurez vos prospects et concluez plus de ventes.
@@ -59,7 +59,7 @@ export function AuthShell({
               <div className="flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 text-xs font-medium text-[var(--brand-navy)]/70">
                   <MessageCircleMore className="size-4 text-[var(--brand-green)]" />
-                  WhatsApp (aperçu)
+                  Chat IA (aperçu)
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-navy)]/10 bg-white px-3 py-1 text-xs font-medium text-[var(--brand-navy)]/70">
                   <Sparkles className="size-3.5 text-[var(--brand-gold)]" />

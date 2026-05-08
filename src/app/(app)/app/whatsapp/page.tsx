@@ -13,9 +13,11 @@ export default async function WhatsAppDashboardPage() {
   const { data: sub } = await supabase.from("subscriptions").select("plan").eq("user_id", data.user.id).maybeSingle();
   if ((sub?.plan ?? "free") !== "pro") redirect("/pricing");
 
-  const { data: integration } = await supabase
-    .from("whatsapp_integrations")
-    .select("status,phone_number,phone_number_id,created_at")
+  const { data: conn } = await supabase
+    .from("whatsapp_connections")
+    .select(
+      "phone_number_id,business_account_id,auto_reply_enabled,paused,human_needed,updated_at,created_at,status,display_phone_number,verified_name,token_expires_at,last_synced_at,last_error",
+    )
     .eq("user_id", data.user.id)
     .maybeSingle();
 
@@ -42,16 +44,22 @@ export default async function WhatsAppDashboardPage() {
     .eq("kind", "won")
     .gte("created_at", startOfDay ?? new Date().toISOString());
 
-  const status = (typeof integration?.status === "string" ? integration.status : "disconnected") as
-    | "connected"
-    | "expired"
-    | "error"
-    | "disconnected";
-
+  const connected = Boolean(conn?.phone_number_id);
+  const metaStatus = typeof conn?.status === "string" ? conn.status : null;
   const statusLabel =
-    status === "connected" ? "WhatsApp connecté ✅" : status === "expired" ? "Expiré" : status === "error" ? "Erreur" : "Non connecté";
+    metaStatus === "expired"
+      ? "Expiré"
+      : metaStatus === "error"
+        ? "Erreur"
+        : !connected
+          ? "Non connecté"
+          : conn?.human_needed
+            ? "Urgent (humain requis)"
+            : conn?.paused
+              ? "En pause"
+              : "Connecté";
 
-  const connectedNumber = integration?.phone_number || integration?.phone_number_id || "—";
+  const connectedNumber = conn?.display_phone_number || conn?.verified_name || conn?.phone_number_id || "—";
 
   return (
     <div className="space-y-4">
@@ -63,11 +71,8 @@ export default async function WhatsAppDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <WhatsAppConnectClient status={status} phoneNumber={integration?.phone_number ?? null} />
-          <Link
-            href="/app/conversations"
-            className="inline-flex h-10 items-center rounded-2xl bg-[var(--brand-green)] px-4 text-sm font-medium text-white shadow-sm"
-          >
+          <WhatsAppConnectClient connected={connected} />
+          <Link href="/app/conversations" className="inline-flex h-10 items-center rounded-2xl bg-[var(--brand-green)] px-4 text-sm font-medium text-white shadow-sm">
             Voir conversations
           </Link>
         </div>
@@ -80,12 +85,9 @@ export default async function WhatsAppDashboardPage() {
           </CardHeader>
           <CardContent className="text-sm text-[var(--brand-navy)]/70">
             <div className="text-lg font-semibold text-[var(--brand-navy)]">{statusLabel}</div>
-            {status === "error" ? (
-              <div className="mt-2 text-xs text-red-600">Connexion WhatsApp en erreur. Cliquez sur reconnecter.</div>
-            ) : null}
-            {status === "expired" ? (
-              <div className="mt-2 text-xs text-red-600">Connexion expirée. Cliquez sur reconnecter.</div>
-            ) : null}
+            <div className="mt-1">IA active: {conn?.auto_reply_enabled && !conn?.paused ? "ON" : "OFF"}</div>
+            <div>Auto réponse: {conn?.auto_reply_enabled ? "ON" : "OFF"}</div>
+            {conn?.last_error ? <div className="mt-2 text-xs text-red-600">{conn.last_error}</div> : null}
           </CardContent>
         </Card>
 
@@ -94,9 +96,10 @@ export default async function WhatsAppDashboardPage() {
             <CardTitle className="text-[var(--brand-navy)]">Numéro connecté</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-[var(--brand-navy)]/70">
-            <div className="font-semibold text-[var(--brand-navy)]">{status === "connected" ? connectedNumber : "—"}</div>
-            <div className="mt-1 text-xs text-[var(--brand-navy)]/55">
-              {status === "connected" ? "WhatsApp Business connecté" : "Aucun numéro connecté"}
+            <div className="font-semibold text-[var(--brand-navy)]">{connected ? connectedNumber : "—"}</div>
+            <div className="mt-1 text-xs text-[var(--brand-navy)]/55">{connected ? "WhatsApp Business connecté" : "Aucun numéro connecté"}</div>
+            <div className="mt-3 text-xs text-[var(--brand-navy)]/60">
+              Dernière synchronisation: {conn?.last_synced_at ? new Date(conn.last_synced_at).toLocaleString("fr-FR") : "—"}
             </div>
           </CardContent>
         </Card>
@@ -116,6 +119,14 @@ export default async function WhatsAppDashboardPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="text-sm text-[var(--brand-navy)]/65">
+        Si la connexion en 1 clic échoue, utilisez la configuration manuelle :{" "}
+        <Link href="/app/integrations/whatsapp" className="font-medium underline underline-offset-4">
+          ouvrir le mode manuel
+        </Link>
+        .
       </div>
     </div>
   );

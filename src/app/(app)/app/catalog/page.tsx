@@ -6,11 +6,12 @@ import { addProduct, deleteProduct } from "./actions";
 import { DocumentUpload } from "./document-upload";
 
 export default async function CatalogPage() {
-  console.log("Render /app/catalog");
-
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) redirect("/login?next=/app/catalog");
+
+  const { data: sub } = await supabase.from("subscriptions").select("plan").eq("user_id", data.user.id).maybeSingle();
+  if ((sub?.plan ?? "free") !== "pro") redirect("/pricing");
 
   const { data: products } = await supabase
     .from("products")
@@ -148,4 +149,3 @@ export default async function CatalogPage() {
     </div>
   );
 }
-

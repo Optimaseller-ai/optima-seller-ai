@@ -18,7 +18,7 @@ export function LeadCapture() {
   function submit() {
     const value = contact.trim();
     if (value.length < 6) {
-      toast({ title: "Contact requis", description: "Entrez un email ou un numero WhatsApp." });
+      toast({ title: "Contact requis", description: "Entrez un email ou un numero de téléphone." });
       return;
     }
 
@@ -33,15 +33,15 @@ export function LeadCapture() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Gift className="size-4 text-[var(--brand-gold)]" />
-          Recevez 20 scripts WhatsApp gratuits + acces beta
+          Recevez 20 scripts gratuits + acces beta
         </CardTitle>
         <CardDescription>
-          Laissez votre email ou numero WhatsApp. (Capture demo, stockage local pour l&apos;instant.)
+          Laissez votre email ou numero de téléphone. (Capture demo, stockage local pour l&apos;instant.)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
-          <Label htmlFor="lead-contact">Email ou WhatsApp</Label>
+          <Label htmlFor="lead-contact">Email ou téléphone</Label>
           <Input
             id="lead-contact"
             value={contact}
@@ -80,7 +80,7 @@ function LeadPopup() {
   function submit() {
     const value = contact.trim();
     if (value.length < 6) {
-      toast({ title: "Contact requis", description: "Entrez un email ou un numero WhatsApp." });
+      toast({ title: "Contact requis", description: "Entrez un email ou un numero de téléphone." });
       return;
     }
     window.localStorage.setItem("optima:lead", JSON.stringify({ contact: value }));
@@ -93,14 +93,14 @@ function LeadPopup() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>20 scripts WhatsApp gratuits</DialogTitle>
+          <DialogTitle>20 scripts gratuits</DialogTitle>
           <DialogDescription>
             Recevez aussi un acces beta a Optima Seller AI.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="lead-popup">Email ou WhatsApp</Label>
+            <Label htmlFor="lead-popup">Email ou téléphone</Label>
             <Input
               id="lead-popup"
               value={contact}
@@ -120,4 +120,3 @@ function LeadPopup() {
     </Dialog>
   );
 }
-

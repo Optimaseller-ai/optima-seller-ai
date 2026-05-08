@@ -15,22 +15,6 @@ const envSchema = z.object({
 
   LEEKPAY_SECRET_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
   LEEKPAY_PUBLIC_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
-
-  // WhatsApp Cloud API (Meta)
-  WHATSAPP_VERIFY_TOKEN: optionalTrimmed.pipe(z.string().min(1).optional()),
-  WHATSAPP_TOKEN_ENC_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
-
-  // Meta OAuth / Embedded Signup
-  META_APP_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
-  META_APP_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
-  META_REDIRECT_URI: optionalTrimmed.pipe(z.string().url().optional()),
-  META_OAUTH_STATE_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
-
-  // Back-compat / quick-start single-tenant envs
-  META_ACCESS_TOKEN: optionalTrimmed.pipe(z.string().min(1).optional()),
-  META_PHONE_NUMBER_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
-  META_WABA_ID: optionalTrimmed.pipe(z.string().min(1).optional()),
-  META_VERIFY_TOKEN: optionalTrimmed.pipe(z.string().min(1).optional()),
 });
 
 export const env = envSchema.parse({
@@ -42,17 +26,4 @@ export const env = envSchema.parse({
 
   LEEKPAY_SECRET_KEY: process.env.LEEKPAY_SECRET_KEY,
   LEEKPAY_PUBLIC_KEY: process.env.LEEKPAY_PUBLIC_KEY,
-
-  WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
-  WHATSAPP_TOKEN_ENC_KEY: process.env.WHATSAPP_TOKEN_ENC_KEY,
-
-  META_APP_ID: process.env.META_APP_ID,
-  META_APP_SECRET: process.env.META_APP_SECRET,
-  META_REDIRECT_URI: process.env.META_REDIRECT_URI,
-  META_OAUTH_STATE_SECRET: process.env.META_OAUTH_STATE_SECRET,
-
-  META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN,
-  META_PHONE_NUMBER_ID: process.env.META_PHONE_NUMBER_ID,
-  META_WABA_ID: process.env.META_WABA_ID,
-  META_VERIFY_TOKEN: process.env.META_VERIFY_TOKEN,
 });

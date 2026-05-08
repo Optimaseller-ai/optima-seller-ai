@@ -25,7 +25,12 @@ type Plan = "free" | "pro";
 
 const CENTER_NAV = [
   { href: "/", label: "Home" },
-  { href: "/app/chat", label: "IA" },
+  { href: "/pricing", label: "Tarifs" },
+] as const;
+
+const CENTER_NAV_AUTHED = [
+  { href: "/", label: "Home" },
+  { href: "/app/chat", label: "Chat IA", requiresPro: true },
   { href: "/pricing", label: "Tarifs" },
 ] as const;
 
@@ -69,16 +74,23 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
 
   const isGuest = userLoaded && !isAuthed;
   const isUser = userLoaded && isAuthed;
+  const inDashboard = pathname?.startsWith("/app");
 
   const proLabel = plan === "pro" ? "Plan Pro actif" : "Passer Pro";
   const proDisabled = plan === "pro";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--brand-navy)]/10 bg-white/80 shadow-[0_12px_35px_-28px_rgba(15,23,42,0.30)] backdrop-blur supports-[backdrop-filter]:bg-white/65">
-      <div className="mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-40">
+      <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6 sm:pt-6">
+        <div className="relative overflow-hidden rounded-2xl border border-black/5 bg-white/70 shadow-[0_18px_55px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-0 [mask-image:radial-gradient(60%_120%_at_50%_0%,black,transparent)]">
+            <div className="absolute -left-24 -top-20 h-56 w-56 rounded-full bg-[rgba(59,130,246,0.10)] blur-3xl" />
+            <div className="absolute -right-28 -top-16 h-64 w-64 rounded-full bg-[rgba(22,163,74,0.12)] blur-3xl" />
+          </div>
+          <div className="mx-auto grid grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-3 sm:px-4">
         <Link
           href={isUser ? "/app" : "/"}
-          className="flex items-center gap-2 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.18)]"
+          className="flex items-center gap-2 rounded-2xl px-2 py-1 transition hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(22,163,74,0.20)]"
         >
           <span className="hidden sm:inline">
             <BrandLogo size="desktop" className="text-[var(--brand-navy)] drop-shadow-[0_10px_25px_rgba(15,23,42,0.08)]" />
@@ -89,20 +101,27 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
         </Link>
 
         <nav className="hidden items-center justify-center gap-2 md:flex">
-          {CENTER_NAV.map((item) => {
+          {(isUser ? CENTER_NAV_AUTHED : CENTER_NAV).map((item) => {
             const active = pathname === item.href;
+            const isDisabled = item.requiresPro && plan !== "pro";
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={isDisabled ? "#" : item.href}
                 className={cn(
-                  "inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition",
+                  "relative inline-flex h-10 items-center rounded-full px-4 text-sm font-medium transition-all duration-200",
                   active
-                    ? "bg-[var(--brand-green)] text-white shadow-sm"
-                    : "text-[var(--brand-navy)]/80 hover:bg-[var(--brand-navy)]/5 hover:text-[var(--brand-navy)]",
+                    ? "bg-[rgba(22,163,74,0.10)] text-[var(--brand-navy)] shadow-[0_12px_30px_rgba(22,163,74,0.10)] ring-1 ring-[rgba(22,163,74,0.18)]"
+                    : isDisabled
+                    ? "text-[var(--brand-navy)]/35 cursor-not-allowed"
+                    : "text-[var(--brand-navy)]/75 hover:bg-black/[0.03] hover:text-[var(--brand-navy)]",
                 )}
+                onClick={isDisabled ? (e) => e.preventDefault() : undefined}
               >
                 {item.label}
+                {item.requiresPro && plan !== "pro" && (
+                  <Badge className="ml-2 text-xs">Pro</Badge>
+                )}
               </Link>
             );
           })}
@@ -125,7 +144,7 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
               <Button asChild variant="ghost" className="hidden md:inline-flex">
                 <Link href="/login">Se connecter</Link>
               </Button>
-              <Button asChild variant="gold" className="hidden md:inline-flex h-11">
+              <Button asChild variant="gold" className="hidden md:inline-flex h-11 shadow-[0_18px_60px_rgba(245,158,11,0.18)]">
                 <Link href="/signup">Essai gratuit 7 jours</Link>
               </Button>
             </>
@@ -143,7 +162,7 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="hidden md:inline-flex h-11 w-11 rounded-full border-[var(--brand-navy)]/15 bg-white p-0 text-[var(--brand-navy)]"
+                    className="hidden md:inline-flex h-11 w-11 rounded-full border-black/10 bg-white/70 p-0 text-[var(--brand-navy)] shadow-sm hover:bg-white"
                     aria-label="Profil"
                   >
                     <User className="size-4" />
@@ -153,9 +172,11 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
                   <DropdownMenuItem asChild>
                     <Link href="/app/profile">Profil</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/app/whatsapp">WhatsApp IA</Link>
-                  </DropdownMenuItem>
+                  {inDashboard ? (
+                    <DropdownMenuItem asChild>
+                      <Link href="/app/chat">Chat IA</Link>
+                    </DropdownMenuItem>
+                  ) : null}
                   <DropdownMenuItem asChild>
                     <Link href="/app/catalog">Catalogue</Link>
                   </DropdownMenuItem>
@@ -173,7 +194,7 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="md:hidden h-11 w-11 rounded-full border-[var(--brand-navy)]/15 bg-white p-0 text-[var(--brand-navy)]"
+                className="md:hidden h-11 w-11 rounded-full border-black/10 bg-white/70 p-0 text-[var(--brand-navy)] shadow-sm hover:bg-white"
                 aria-label="Menu"
               >
                 <Menu className="size-5" />
@@ -182,9 +203,6 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem asChild>
                 <Link href="/">Home</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/app/chat">IA</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/pricing">Tarifs</Link>
@@ -198,9 +216,6 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/app/profile">Profil</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/app/whatsapp">WhatsApp IA</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/app/catalog">Catalogue</Link>
@@ -223,6 +238,8 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+      </div>
         </div>
       </div>
     </header>

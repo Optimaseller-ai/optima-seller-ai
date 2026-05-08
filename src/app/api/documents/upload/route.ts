@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { openRouterEmbed } from "@/lib/ai/openrouter";
+import { chunkText } from "@/lib/ai/chunking";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,9 @@ export async function POST(req: Request) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return jsonError(401, "UNAUTHORIZED");
 
+  const { data: sub } = await supabase.from("subscriptions").select("plan").eq("user_id", auth.user.id).maybeSingle();
+  if ((sub?.plan ?? "free") !== "pro") return jsonError(403, "PRO_REQUIRED");
+
   let form: FormData;
   try {
     form = await req.formData();
@@ -66,6 +71,22 @@ export async function POST(req: Request) {
     if (docErr || !doc?.id) {
       console.error("documents insert error:", docErr);
       return jsonError(500, "DOCUMENT_SAVE_FAILED");
+    }
+
+    // Chunk + embeddings (top-level ingestion step for retrieval)
+    const chunks = chunkText(text, { chunkSize: 1200, overlap: 150 }).slice(0, 120);
+    for (const chunk of chunks) {
+      const embedding = await openRouterEmbed({ input: chunk });
+      const { error: chunkErr } = await admin.from("document_chunks").insert({
+        document_id: doc.id,
+        user_id: auth.user.id,
+        content: chunk,
+        embedding: embedding as any,
+      } as any);
+      if (chunkErr) {
+        console.error("document_chunks insert error:", chunkErr);
+        return jsonError(500, "CHUNK_SAVE_FAILED");
+      }
     }
 
     return NextResponse.json({ ok: true, document_id: doc.id });

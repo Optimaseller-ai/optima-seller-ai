@@ -46,12 +46,7 @@ export async function consumeOneGenerationOrThrow(userId: string) {
   const sub = await ensureSubscriptionRow(userId);
 
   const plan = isProActive(sub) ? "pro" : "free";
-  const quotaLimit =
-    plan === "pro"
-      ? typeof sub.quota_limit === "number"
-        ? sub.quota_limit
-        : 2000
-      : 100;
+  const quotaLimit = plan === "pro" ? null : 100;
 
   const periodStart = DateTime.utc().startOf("month").toISODate();
   const { data: counter, error: counterErr } = await supabase
@@ -63,7 +58,7 @@ export async function consumeOneGenerationOrThrow(userId: string) {
   if (counterErr) throw counterErr;
 
   const usedThisMonth = typeof counter?.used === "number" ? counter.used : 0;
-  if (usedThisMonth >= quotaLimit) {
+  if (quotaLimit != null && usedThisMonth >= quotaLimit) {
     throw new Error("Quota atteint pour ce mois. Passez Pro pour continuer.");
   }
 
@@ -106,8 +101,13 @@ export async function consumeOneGenerationOrThrow(userId: string) {
 
   await supabase
     .from("subscriptions")
-    .update({ plan, quota_limit: quotaLimit, quota_used: nextUsed, updated_at: new Date().toISOString() })
+    .update({
+      plan,
+      quota_limit: quotaLimit ?? 999999,
+      quota_used: nextUsed,
+      updated_at: new Date().toISOString(),
+    })
     .eq("user_id", userId);
 
-  return { plan, quotaLimit, quotaUsed: nextUsed } as const;
+  return { plan, quotaLimit: quotaLimit ?? 999999, quotaUsed: nextUsed } as const;
 }

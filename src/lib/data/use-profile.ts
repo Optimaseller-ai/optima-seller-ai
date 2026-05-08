@@ -69,13 +69,7 @@ export function useProfile(): UseProfileState {
   const [userId, setUserId] = React.useState<string | null>(null);
   const [profile, setProfile] = React.useState<ProfileRow | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const channelSuffix = React.useMemo(() => {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    }
-  }, []);
+  const channelSuffix = React.useId();
 
   const refresh = React.useCallback(async () => {
     const supabase = createOptionalSupabaseClient();
@@ -99,11 +93,7 @@ export function useProfile(): UseProfileState {
 
       setUserId(auth.user.id);
 
-      const { data: row, error: dbErr } = await supabase
-        .from("profiles")
-        .select(SELECT)
-        .eq("id", auth.user.id)
-        .maybeSingle();
+      const { data: row, error: dbErr } = await supabase.from("profiles").select(SELECT).eq("id", auth.user.id).maybeSingle();
       if (dbErr) throw dbErr;
 
       if (!row) {
@@ -112,17 +102,28 @@ export function useProfile(): UseProfileState {
         return;
       }
 
-      setProfile(normalizeProfileRow(row as any));
+      setProfile(normalizeProfileRow(row as Record<string, unknown>));
       setError(null);
-    } catch (err: any) {
-      setError(typeof err?.message === "string" ? err.message : "Erreur profile.");
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "message" in err && typeof (err as { message?: unknown }).message === "string") {
+        setError((err as { message: string }).message);
+      } else {
+        setError("Erreur profile.");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    void refresh();
+    let canceled = false;
+    void Promise.resolve().then(async () => {
+      if (canceled) return;
+      await refresh();
+    });
+    return () => {
+      canceled = true;
+    };
   }, [refresh]);
 
   React.useEffect(() => {
@@ -136,9 +137,9 @@ export function useProfile(): UseProfileState {
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles", filter: `id=eq.${userId}` },
         (payload) => {
-          const next = (payload.new ?? payload.old) as any;
-          if (!next) return;
-          setProfile(normalizeProfileRow(next));
+          const next = (payload.new ?? payload.old) as unknown;
+          if (!next || typeof next !== "object") return;
+          setProfile(normalizeProfileRow(next as Record<string, unknown>));
         },
       )
       .subscribe();
@@ -191,3 +192,4 @@ export function useProfile(): UseProfileState {
 
   return { loading, userId, profile, error, upsert, refresh };
 }
+

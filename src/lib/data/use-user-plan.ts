@@ -15,14 +15,12 @@ export type UseUserPlanState = {
 
 export function useUserPlan(): UseUserPlanState {
   const sub = useSubscription();
+  const supabase = React.useMemo(() => createOptionalSupabaseClient(), []);
   const [user, setUser] = React.useState<User | null>(null);
-  const [authReady, setAuthReady] = React.useState(false);
+  const [authReady, setAuthReady] = React.useState(() => !supabase);
 
   React.useEffect(() => {
-    const supabase = createOptionalSupabaseClient();
     if (!supabase) {
-      setUser(null);
-      setAuthReady(true);
       return;
     }
 
@@ -45,7 +43,7 @@ export function useUserPlan(): UseUserPlanState {
       data.subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [supabase]);
 
   const isLoggedIn = Boolean(user);
   const isPro = isLoggedIn && isSubscriptionActive(sub.subscription) && sub.subscription?.plan === "pro";

@@ -8,6 +8,9 @@ export async function addProduct(formData: FormData) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false as const, message: "UNAUTHORIZED" };
 
+  const { data: sub } = await supabase.from("subscriptions").select("plan").eq("user_id", auth.user.id).maybeSingle();
+  if ((sub?.plan ?? "free") !== "pro") return { ok: false as const, message: "PRO_REQUIRED" };
+
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim() || null;
@@ -43,6 +46,9 @@ export async function deleteProduct(productId: string) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false as const, message: "UNAUTHORIZED" };
+
+  const { data: sub } = await supabase.from("subscriptions").select("plan").eq("user_id", auth.user.id).maybeSingle();
+  if ((sub?.plan ?? "free") !== "pro") return { ok: false as const, message: "PRO_REQUIRED" };
 
   const { error } = await supabase.from("products").delete().eq("id", productId).eq("user_id", auth.user.id);
   if (error) {

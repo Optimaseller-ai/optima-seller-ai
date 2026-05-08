@@ -27,6 +27,7 @@ export const PLAN_LIMITS = {
 } as const;
 
 export function hasProFeature(plan: PlanId, feature: ProFeature) {
+  void feature;
   if (plan === "pro") return true;
   return false;
 }

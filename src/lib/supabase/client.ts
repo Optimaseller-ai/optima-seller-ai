@@ -1,6 +1,17 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { env } from "@/lib/env";
 
+type CookieOptions = {
+  path?: string;
+  maxAge?: number;
+  expires?: string | number | Date;
+  sameSite?: string;
+  secure?: boolean;
+  [key: string]: unknown;
+};
+
+type CookieToSet = { name: string; value: string; options?: CookieOptions };
+
 export function createClient() {
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     throw new Error(
@@ -8,7 +19,10 @@ export function createClient() {
     );
   }
 
-  const cookieAdapter = {
+  const cookieAdapter: {
+    getAll(): { name: string; value: string }[];
+    setAll(cookiesToSet: CookieToSet[]): void;
+  } = {
     getAll() {
       if (typeof document === "undefined") return [];
       const raw = document.cookie ?? "";
@@ -23,7 +37,7 @@ export function createClient() {
           return { name: decodeURIComponent(p.slice(0, idx)), value: decodeURIComponent(p.slice(idx + 1)) };
         });
     },
-    setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+    setAll(cookiesToSet: CookieToSet[]) {
       if (typeof document === "undefined") return;
       cookiesToSet.forEach(({ name, value, options }) => {
         const opt = options ?? {};
@@ -38,6 +52,6 @@ export function createClient() {
   };
 
   return createBrowserClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
-    cookies: cookieAdapter as any,
+    cookies: cookieAdapter,
   });
 }

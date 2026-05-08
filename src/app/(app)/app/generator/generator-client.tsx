@@ -150,7 +150,7 @@ export function GeneratorClient() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)] sm:text-3xl">
-              Générateur IA WhatsApp
+              Générateur IA
             </h1>
             <p className="text-sm text-[var(--brand-navy)]/65 sm:text-base">
               Créez des réponses qui rassurent, relancent et concluent des ventes.
@@ -267,7 +267,7 @@ export function GeneratorClient() {
         <Card className="border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
           <CardHeader>
             <CardTitle className="text-base text-[var(--brand-navy)]">Votre message</CardTitle>
-            <CardDescription>Collez le contexte WhatsApp tel quel.</CardDescription>
+            <CardDescription>Collez le contexte client tel quel.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 p-3 sm:p-6">
             <Textarea
@@ -298,7 +298,7 @@ export function GeneratorClient() {
       <Card className="border-[var(--brand-navy)]/10 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
         <CardHeader>
           <CardTitle className="text-base text-[var(--brand-navy)]">Résultats</CardTitle>
-          <CardDescription>3 options prêtes à copier-coller dans WhatsApp.</CardDescription>
+          <CardDescription>3 options prêtes à copier-coller.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 p-3 sm:p-6">
           {results.length === 0 ? (
@@ -365,7 +365,7 @@ const MODES: {
   },
   {
     id: "promo",
-    label: "Promo WhatsApp",
+    label: "Promo",
     description: "Message promo clair avec CTA.",
     icon: Megaphone,
   },

@@ -68,7 +68,7 @@ export default async function AppChatPage() {
       const { data: agent2 } = await supabase.from("agents").select("id,slug").eq("user_id", data.user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
 
       if (agent2?.id && agent2.slug) {
-        await supabase.from("chat_links").insert({ slug: agent2.slug, user_id: data.user.id, agent_id: agent2.id } as any).catch(() => null);
+        await supabase.from("chat_links").insert({ slug: agent2.slug, user_id: data.user.id, agent_id: agent2.id } as any);
       }
 
       const { data: agent3 } = await supabase

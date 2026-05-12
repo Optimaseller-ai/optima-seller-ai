@@ -24,15 +24,7 @@ const checkoutPayloadSchema = z
   .transform((v) => {
     const payment_url = v.payment_url ?? v.paymentUrl ?? v.url;
     if (!payment_url) {
-      throw new z.ZodError([
-        {
-          code: "invalid_type",
-          expected: "string",
-          received: "undefined",
-          path: ["payment_url"],
-          message: "Invalid input: expected string, received undefined",
-        },
-      ]);
+      throw new Error("LeekPay response missing payment_url.");
     }
     return { payment_url, payment_id: v.payment_id ?? v.paymentId };
   });

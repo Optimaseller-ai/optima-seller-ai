@@ -41,7 +41,13 @@ export default async function CatalogPage() {
             <CardTitle className="text-[var(--brand-navy)]">Produits</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={addProduct} className="grid gap-3">
+            <form
+              action={async (formData: FormData) => {
+                "use server";
+                await addProduct(formData);
+              }}
+              className="grid gap-3"
+            >
               <input
                 name="name"
                 placeholder="Nom (ex: Chaussures Nike)"

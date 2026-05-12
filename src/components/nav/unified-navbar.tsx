@@ -23,16 +23,22 @@ import { UpgradeButton } from "@/components/premium/UpgradeButton";
 
 type Plan = "free" | "pro";
 
+type CenterNavItem = {
+  href: string;
+  label: string;
+  requiresPro?: boolean;
+};
+
 const CENTER_NAV = [
   { href: "/", label: "Home" },
   { href: "/pricing", label: "Tarifs" },
-] as const;
+] satisfies readonly CenterNavItem[];
 
 const CENTER_NAV_AUTHED = [
   { href: "/", label: "Home" },
   { href: "/app/chat", label: "Chat IA", requiresPro: true },
   { href: "/pricing", label: "Tarifs" },
-] as const;
+] satisfies readonly CenterNavItem[];
 
 export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null } = {}) {
   const pathname = usePathname();
@@ -75,6 +81,7 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
   const isGuest = userLoaded && !isAuthed;
   const isUser = userLoaded && isAuthed;
   const inDashboard = pathname?.startsWith("/app");
+  const centerNavItems: readonly CenterNavItem[] = isUser ? CENTER_NAV_AUTHED : CENTER_NAV;
 
   const proLabel = plan === "pro" ? "Plan Pro actif" : "Passer Pro";
   const proDisabled = plan === "pro";
@@ -101,7 +108,7 @@ export function UnifiedNavbar({ initialUserId }: { initialUserId?: string | null
         </Link>
 
         <nav className="hidden items-center justify-center gap-2 md:flex">
-          {(isUser ? CENTER_NAV_AUTHED : CENTER_NAV).map((item) => {
+          {centerNavItems.map((item) => {
             const active = pathname === item.href;
             const isDisabled = item.requiresPro && plan !== "pro";
             return (

@@ -90,7 +90,7 @@ export async function consumeOneGenerationOrThrow(userId: string) {
         .maybeSingle();
       if (latestErr) throw latestErr;
       const used2 = typeof latest?.used === "number" ? latest.used : 0;
-      if (used2 >= quotaLimit) throw new Error("Quota atteint pour ce mois. Passez Pro pour continuer.");
+      if (quotaLimit != null && used2 >= quotaLimit) throw new Error("Quota atteint pour ce mois. Passez Pro pour continuer.");
       await supabase
         .from("usage_monthly")
         .update({ used: used2 + 1, updated_at: new Date().toISOString() })

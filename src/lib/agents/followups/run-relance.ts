@@ -3,7 +3,6 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { openRouterChat } from "@/lib/ai/openrouter";
 import { getBusinessContext } from "@/lib/agents/business-context/catalog-rag";
-import { openRouterChat } from "@/lib/ai/openrouter";
 import { resolveBusinessTimezone } from "@/lib/agents/timing/business-timezone";
 import { getCommercialAgentById } from "@/lib/agents/personality/commercial-agents";
 import { isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";

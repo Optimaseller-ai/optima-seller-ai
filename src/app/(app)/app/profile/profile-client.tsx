@@ -148,9 +148,9 @@ export function ProfileClient() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={mem.hasAny ? "success" : "gold"} title="MÃ©moire business pour lâ€™IA">
+          <Badge variant={mem.status === "active" ? "success" : "gold"} title="MÃ©moire business pour lâ€™IA">
             <MessageCircleMore className="size-3.5 text-[var(--brand-green)]" />
-            MÃ©moire {mem.hasAny ? "active" : "Ã  configurer"}
+            MÃ©moire {mem.status === "active" ? "active" : "Ã  configurer"}
           </Badge>
           <Badge variant={dirty ? "gold" : "muted"}>{syncLabel}</Badge>
           <Button onClick={() => saveNow()} disabled={Boolean(error) || loading || saving || !dirty} className="h-9">

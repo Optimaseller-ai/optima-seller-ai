@@ -998,7 +998,7 @@ export default function ChatClient({
 
     function computeIsAtBottom() {
       const thresholdPx = 72;
-      return el.scrollHeight - el.scrollTop - el.clientHeight <= thresholdPx;
+      return el!.scrollHeight - el!.scrollTop - el!.clientHeight <= thresholdPx;
     }
 
     function onScroll() {
@@ -1380,10 +1380,10 @@ export default function ChatClient({
         const has = prev.some((m) => m.id === typingId);
         if (visible && has) return prev;
         if (!visible && !has) return prev;
-        const next = visible
+        const next: UiMessage[] = visible
           ? [
               ...prev,
-              { id: typingId, role: "assistant", content: "typing", ts: new Date().toISOString(), typing: true, animateIn: "left" },
+              { id: typingId, role: "assistant", content: "typing", ts: new Date().toISOString(), typing: true, animateIn: "left" as const },
             ]
           : prev.filter((x) => x.id !== typingId);
         persistFromUi(next);

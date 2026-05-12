@@ -1,10 +1,11 @@
 "use client";
 
+import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 let cachedClient: ReturnType<typeof createClient> | null = null;
-let inFlightGetUser: Promise<{ data: { user: unknown | null } }> | null = null;
-let inFlightGetSession: Promise<{ data: { session: unknown | null } }> | null = null;
+let inFlightGetUser: Promise<{ data: { user: User | null } }> | null = null;
+let inFlightGetSession: Promise<{ data: { session: Session | null } }> | null = null;
 
 export function createOptionalSupabaseClient() {
   try {
@@ -17,7 +18,7 @@ export function createOptionalSupabaseClient() {
 
 // Coalesce concurrent getUser() calls to avoid @supabase/gotrue-js lock contention
 // (common in React Strict Mode, or when multiple hooks call getUser on mount).
-export async function authGetUserCoalesced(supabase: { auth: { getUser: () => Promise<{ data: { user: unknown | null } }> } }) {
+export async function authGetUserCoalesced(supabase: { auth: { getUser: () => Promise<{ data: { user: User | null } }> } }) {
   if (!inFlightGetUser) {
     inFlightGetUser = supabase.auth
       .getUser()
@@ -31,7 +32,7 @@ export async function authGetUserCoalesced(supabase: { auth: { getUser: () => Pr
   return inFlightGetUser;
 }
 
-export async function authGetSessionCoalesced(supabase: { auth: { getSession: () => Promise<{ data: { session: unknown | null } }> } }) {
+export async function authGetSessionCoalesced(supabase: { auth: { getSession: () => Promise<{ data: { session: Session | null } }> } }) {
   if (!inFlightGetSession) {
     inFlightGetSession = supabase.auth
       .getSession()

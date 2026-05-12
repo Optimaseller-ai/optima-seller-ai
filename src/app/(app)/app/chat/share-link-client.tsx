@@ -1,20 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function ChatLinkClient({ plan, slug }: { plan: "free" | "pro"; slug: string }) {
+export default function ChatLinkClient({
+  plan,
+  slug,
+  recentSlugs = [],
+}: {
+  plan: "free" | "pro";
+  slug: string;
+  recentSlugs?: string[];
+}) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [localSlug, setLocalSlug] = useState(slug);
 
+  const [origin, setOrigin] = useState("");
+  useEffect(() => {
+    setOrigin(typeof window !== "undefined" && window.location?.origin ? window.location.origin : "");
+  }, []);
+
   const url = useMemo(() => {
     if (!localSlug) return "";
-    const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "https://tonsite.com";
-    return `${origin}/chat/${localSlug}`;
-  }, [localSlug]);
+    const base = origin || "https://tonsite.com";
+    return `${base}/chat/${localSlug}`;
+  }, [localSlug, origin]);
 
   async function copy() {
     if (!url) return;
@@ -127,6 +140,25 @@ export default function ChatLinkClient({ plan, slug }: { plan: "free" | "pro"; s
               </Link>
             ) : null}
           </div>
+
+          {plan === "pro" && recentSlugs.length > 1 ? (
+            <div className="mt-4 rounded-2xl border border-[var(--brand-navy)]/10 bg-[hsl(var(--background))] p-3">
+              <div className="text-xs font-semibold text-[var(--brand-navy)]/70">Liens récents (un agent fixe par lien)</div>
+              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-[var(--brand-navy)]/85">
+                {recentSlugs.map((s) => (
+                  <li key={s}>
+                    <button
+                      type="button"
+                      className="w-full truncate text-left underline-offset-2 hover:underline"
+                      onClick={() => setLocalSlug(s)}
+                    >
+                      {(origin || "…") + "/chat/" + s}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

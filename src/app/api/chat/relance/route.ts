@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { runRelanceForConversation } from "@/lib/chat/run-relance";
 
+export const runtime = "nodejs";
+
 const BodySchema = z.object({
   conversation_id: z.string().uuid(),
 });

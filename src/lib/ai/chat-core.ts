@@ -1,5 +1,7 @@
 import { DateTime } from "luxon";
 import { z } from "zod";
+import { openRouterKeepAliveAgent } from "@/lib/ai/openrouter";
+import { resolveBusinessTimezone } from "@/lib/ai/businessTimezoneResolver";
 import { serverEnv } from "../server-env";
 import { createClient as createSupabaseServerClient } from "../supabase/server";
 import {
@@ -524,6 +526,7 @@ async function openRouterChat(args: {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${serverEnv.OPENROUTER_API_KEY}`,
     "Content-Type": "application/json",
+    Connection: "keep-alive",
   };
   if (serverEnv.OPENROUTER_SITE_URL) headers["HTTP-Referer"] = serverEnv.OPENROUTER_SITE_URL;
   if (serverEnv.OPENROUTER_APP_NAME) headers["X-OpenRouter-Title"] = serverEnv.OPENROUTER_APP_NAME;
@@ -531,10 +534,12 @@ async function openRouterChat(args: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), args.timeoutMs);
 
+  const started = Date.now();
   const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers,
     signal: controller.signal,
+    dispatcher: openRouterKeepAliveAgent,
     body: JSON.stringify({
       model: args.model,
       temperature: args.temperature,
@@ -551,10 +556,16 @@ async function openRouterChat(args: {
         },
       ],
     }),
-  }).finally(() => clearTimeout(timeout));
+  } as RequestInit).finally(() => clearTimeout(timeout));
+
+  const durationMs = Date.now() - started;
+  console.log("[OPTIMA_AI_CHAT_CORE]", "openrouter_response", { status: resp.status, durationMs, model: args.model });
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
+    const errPayload = { status: resp.status, durationMs, snippet: text.slice(0, 400) };
+    if (resp.status === 429 || resp.status >= 500) console.error("[OPTIMA_AI_ERROR]", errPayload);
+    else console.error("[OPTIMA_AI_CHAT_CORE]", "openrouter_http_error", errPayload);
     return {
       ok: false as const,
       status: resp.status,
@@ -642,10 +653,6 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
     "perplexity/sonar",
   ].filter((m) => m !== primaryModel) as AllowedModel[];
 
-  const userTz = normalizeTimezone(parsed.data.userTimezone);
-  const now = DateTime.now().setZone(userTz);
-  const current = `${now.toFormat("yyyy-LL-dd HH:mm")} (${userTz})`;
-
   const mode: CoreMode = parsed.data.mode ?? "reply";
   const historyMaxAgeMs = plan === "pro" ? Infinity : 3 * 24 * 60 * 60 * 1000;
   const nowMs = Date.now();
@@ -668,12 +675,21 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
   const businessProfileContext = businessProfileData.context;
   const businessProfile = businessProfileData.profile;
 
+  const userTz = normalizeTimezone(parsed.data.userTimezone);
+  const resolvedBusinessTz =
+    businessProfile?.city || businessProfile?.country
+      ? resolveBusinessTimezone({ city: businessProfile.city, country: businessProfile.country })
+      : null;
+  const effectiveTz = resolvedBusinessTz?.iana ?? userTz;
+  const now = DateTime.now().setZone(effectiveTz);
+  const current = `${now.toFormat("yyyy-LL-dd HH:mm")} (${effectiveTz})`;
+
   if (isWhoAmIIntent(parsed.data.message) && businessProfile) {
     const capabilities: ChatCoreCapabilities = {
       realtime: true,
       webSearch: true,
       businessMemory: true,
-      timezone: userTz,
+      timezone: effectiveTz,
       currentDateTime: current,
     };
     return {
@@ -728,8 +744,15 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
         emotionTone ? `PROSPECT STATE: ${emotionTone}` : null,
         intentionTone ? `INTENT: ${intentionTone}` : null,
         "",
-        `Current date/time: ${current}.`,
-        `User timezone: ${userTz}.`,
+        `Current date/time (business local): ${current}.`,
+        `Business local IANA timezone: ${effectiveTz}.`,
+        `Client-reported timezone (fallback only): ${userTz}.`,
+        [
+          "GREETING / LOCAL TIME (business timezone above):",
+          "- Use the business local clock as the reference for day vs evening.",
+          "- If they say a specific phrase like “good afternoon”, keep it consistent — don’t snap to “good evening” unless blending naturally.",
+          "- If their generic greeting mismatches local time, prefer the correct greeting without correcting them harshly (no “it’s not morning”).",
+        ].join("\n"),
         businessProfileContext ? "" : null,
         businessProfileContext ? `Business profile context:\n${businessProfileContext}` : null,
         "",
@@ -759,7 +782,7 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
       realtime: true,
       webSearch: true,
       businessMemory: Boolean(businessProfileContext),
-      timezone: userTz,
+      timezone: effectiveTz,
       currentDateTime: current,
     };
     return { ok: true, data: { ...result, message: cleanedMessage, capabilities } };
@@ -773,7 +796,7 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
           realtime: true,
           webSearch: true,
           businessMemory: Boolean(businessProfileContext),
-          timezone: userTz,
+          timezone: effectiveTz,
           currentDateTime: current,
         };
         return { ok: true, data: { ...result, message: cleanedMessage, capabilities } };

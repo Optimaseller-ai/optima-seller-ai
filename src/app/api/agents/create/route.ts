@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { pickStableCommercialAgentForSeed } from "@/lib/chat/commercial-agents";
+
+export const runtime = "nodejs";
 
 function ok(url: string) {
   return NextResponse.json({ success: true, url }, { status: 200 });
@@ -28,25 +31,10 @@ export async function POST(req: Request) {
   }
   if ((sub?.plan ?? "free") !== "pro") return fail(403, "upgrade required");
 
-  const { data: existing, error: exErr } = await supabase
-    .from("agents")
-    .select("slug")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<{ slug: string }>();
-  if (exErr) {
-    console.log("[agents/create] agent lookup error", { userId: user.id, message: exErr.message, code: (exErr as any)?.code ?? null });
-    if ((exErr as any)?.code === "PGRST205") return fail(500, "missing_agents_table");
-    return fail(500, "agent_lookup_failed");
-  }
-
   const baseUrl =
     (process.env.NEXT_PUBLIC_SITE_URL || "").trim() ||
     (req.headers.get("origin") || "").trim() ||
     "http://localhost:3000";
-
-  if (existing?.slug) return ok(`${baseUrl}/chat/${existing.slug}`);
 
   const { data: prof, error: profErr } = await supabase
     .from("profiles")
@@ -55,19 +43,42 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (profErr) console.log("[agents/create] profile lookup error", { userId: user.id, message: profErr.message, code: (profErr as any)?.code ?? null });
 
-  const name = String((prof as any)?.business_name ?? (prof as any)?.shop_name ?? "").trim() || "Agent IA";
+  const businessName = String((prof as any)?.business_name ?? (prof as any)?.shop_name ?? "").trim() || "Notre boutique";
 
   for (let attempt = 1; attempt <= 5; attempt++) {
     const slug = slugCandidate();
-    console.log("[agents/create] creating agent", { userId: user.id, attempt, slug });
+    const persona = pickStableCommercialAgentForSeed(slug);
+    console.log("[agents/create] creating agent + link", { userId: user.id, attempt, slug, persona: persona.id });
 
     const { data: created, error: insErr } = await supabase
       .from("agents")
-      .insert({ user_id: user.id, name, slug, is_active: true } as any)
-      .select("slug")
-      .maybeSingle<{ slug: string }>();
+      .insert({
+        user_id: user.id,
+        name: businessName,
+        slug,
+        is_active: true,
+        persona_key: persona.id,
+      } as any)
+      .select("id,slug")
+      .maybeSingle<{ id: string; slug: string }>();
 
-    if (!insErr && created?.slug) return ok(`${baseUrl}/chat/${created.slug}`);
+    if (!insErr && created?.slug) {
+      const linkIns = await supabase.from("chat_links").insert({
+        slug: created.slug,
+        user_id: user.id,
+        agent_id: created.id,
+      } as any);
+
+      if (linkIns.error) {
+        console.log("[agents/create] chat_links insert error (agent created)", {
+          userId: user.id,
+          message: linkIns.error.message,
+          code: (linkIns.error as any)?.code ?? null,
+        });
+      }
+
+      return ok(`${baseUrl}/chat/${created.slug}`);
+    }
 
     console.log("[agents/create] insert error", { userId: user.id, attempt, message: insErr?.message ?? null, code: (insErr as any)?.code ?? null });
     if ((insErr as any)?.code === "PGRST205") return fail(500, "missing_agents_table");

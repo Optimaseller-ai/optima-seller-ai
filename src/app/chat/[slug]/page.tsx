@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClientSafe } from "@/lib/supabase/admin";
+import { resolvePublicPersonaForAgent } from "@/lib/chat/commercial-agents";
 import ChatClient from "./chat-client";
 
 export default async function PublicChatPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -19,9 +20,18 @@ export default async function PublicChatPage({ params }: { params: Promise<{ slu
     );
   }
 
-  const { data: agent } = await admin.from("agents").select("id,name,slug,is_active").eq("slug", clean).maybeSingle();
+  const { data: agent } = await admin
+    .from("agents")
+    .select("id,name,slug,is_active,persona_key")
+    .eq("slug", clean)
+    .maybeSingle();
   if (!agent?.id || !agent.is_active) notFound();
 
-  return <ChatClient slug={clean} agentName={agent.name ?? "Assistant"} />;
+  const lockedPersona = resolvePublicPersonaForAgent({
+    personaKey: (agent as { persona_key?: string | null }).persona_key,
+    agentId: agent.id,
+  });
+
+  return <ChatClient slug={clean} agentName={agent.name ?? "Service client"} lockedPersona={lockedPersona} />;
 }
 

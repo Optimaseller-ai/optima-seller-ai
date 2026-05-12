@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolvePublicPersonaForAgent } from "@/lib/chat/commercial-agents";
+
+export const runtime = "nodejs";
 
 const BodySchema = z.object({
   slug: z.string().trim().min(2).max(120),
@@ -17,7 +20,7 @@ export async function POST(req: Request) {
 
   const { data: agent, error: agentErr } = await admin
     .from("agents")
-    .select("id,user_id,is_active,name,slug")
+    .select("id,user_id,is_active,name,slug,persona_key")
     .eq("slug", slug)
     .maybeSingle();
   if (agentErr) return NextResponse.json({ error: "agent_lookup_failed" }, { status: 500 });
@@ -33,9 +36,11 @@ export async function POST(req: Request) {
     .eq("session_id", session_id)
     .maybeSingle();
 
+  const persona = resolvePublicPersonaForAgent({ personaKey: (agent as any).persona_key, agentId: agent.id });
+
   return NextResponse.json({
     agent: { id: agent.id, name: agent.name, slug: agent.slug },
+    persona,
     messages: Array.isArray(conv?.messages) ? conv?.messages : [],
   });
 }
-

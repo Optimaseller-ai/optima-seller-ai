@@ -35,10 +35,10 @@
   /* Light premium background tokens */
   --bg-0: #f7fafc;
   --bg-1: #f2f7ff;
-  --glow-green: rgba(22, 163, 74, 0.16);
-  --glow-blue: rgba(59, 130, 246, 0.14);
-  --glow-violet: rgba(139, 92, 246, 0.10);
-  --glow-amber: rgba(245, 158, 11, 0.10);
+  --glow-green: rgba(52, 120, 103, 0.09);
+  --glow-blue: rgba(99, 125, 168, 0.11);
+  --glow-violet: rgba(120, 113, 160, 0.07);
+  --glow-amber: rgba(180, 155, 120, 0.06);
 }
 
 @theme inline {
@@ -100,10 +100,10 @@
 
   --bg-0: #f7fafc;
   --bg-1: #f2f7ff;
-  --glow-green: rgba(22, 163, 74, 0.16);
-  --glow-blue: rgba(59, 130, 246, 0.14);
-  --glow-violet: rgba(139, 92, 246, 0.10);
-  --glow-amber: rgba(245, 158, 11, 0.10);
+  --glow-green: rgba(52, 120, 103, 0.09);
+  --glow-blue: rgba(99, 125, 168, 0.11);
+  --glow-violet: rgba(120, 113, 160, 0.07);
+  --glow-amber: rgba(180, 155, 120, 0.06);
 }
 
 :root[data-theme="dark"] {
@@ -127,15 +127,16 @@
 
   --bg-0: #f7fafc;
   --bg-1: #f2f7ff;
-  --glow-green: rgba(22, 163, 74, 0.16);
-  --glow-blue: rgba(59, 130, 246, 0.14);
-  --glow-violet: rgba(139, 92, 246, 0.10);
-  --glow-amber: rgba(245, 158, 11, 0.10);
+  --glow-green: rgba(52, 120, 103, 0.09);
+  --glow-blue: rgba(99, 125, 168, 0.11);
+  --glow-violet: rgba(120, 113, 160, 0.07);
+  --glow-amber: rgba(180, 155, 120, 0.06);
 }
 
 body {
   background: linear-gradient(180deg, var(--bg-0), var(--bg-1));
   color: hsl(var(--foreground));
+  overflow-x: hidden;
   transition: background 260ms cubic-bezier(0.2, 0.9, 0.2, 1), color 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
 }
 
@@ -214,10 +215,10 @@ body {
 
 .optima-chat-shell {
   background:
-    radial-gradient(620px 360px at 8% -6%, rgba(16, 185, 129, 0.10), transparent 65%),
-    radial-gradient(760px 460px at 92% -6%, rgba(59, 130, 246, 0.10), transparent 66%),
-    radial-gradient(700px 520px at 48% 100%, rgba(14, 165, 233, 0.06), transparent 68%),
-    linear-gradient(180deg, #fbfdff, #f5f9ff 40%, #f7fbf8 100%);
+    radial-gradient(720px 420px at 12% 0%, rgba(248, 250, 252, 0.95), transparent 58%),
+    radial-gradient(640px 380px at 88% 8%, rgba(241, 245, 249, 0.88), transparent 55%),
+    radial-gradient(520px 480px at 50% 100%, rgba(226, 232, 240, 0.35), transparent 62%),
+    linear-gradient(165deg, #fafbfc 0%, #f4f6f9 42%, #f1f4f8 100%);
   position: relative;
   overflow: hidden;
 }
@@ -228,8 +229,10 @@ body {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 25% 18%, rgba(255, 255, 255, 0.6), transparent 45%),
-    radial-gradient(circle at 80% 16%, rgba(255, 255, 255, 0.52), transparent 42%);
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 255, 255, 0.85), transparent 52%),
+    radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.35), transparent 38%);
+  filter: blur(24px);
+  opacity: 0.85;
   z-index: 0;
 }
 
@@ -238,11 +241,19 @@ body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.16;
-  background-image: radial-gradient(rgba(15, 23, 42, 0.09) 0.75px, transparent 0.75px);
-  background-size: 18px 18px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), black 35%, rgba(0, 0, 0, 0.35));
+  opacity: 0.055;
+  background-image: radial-gradient(rgba(51, 65, 85, 0.45) 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
+  mask-image: radial-gradient(ellipse 120% 80% at 50% 45%, black 0%, transparent 72%);
   z-index: 0;
+}
+
+.optima-chat-shell [data-premium-hover="true"] {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .optima-chat-shell > * {
@@ -250,10 +261,46 @@ body {
   z-index: 1;
 }
 
+/* Native-feel scroll: invisible until hover (conversation list) */
 .chat-scroll {
   -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.chat-scroll:hover {
+  scrollbar-color: rgba(100, 116, 139, 0.14) transparent;
+}
+
+/* Zone conversation uniquement : défilement fluide, inertie tactile, pas de chaînage au body */
+.chat-thread-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   scroll-behavior: smooth;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.18) transparent;
+}
+.chat-thread-scroll:hover {
+  scrollbar-color: rgba(71, 85, 105, 0.35) transparent;
+}
+.chat-thread-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.chat-thread-scroll::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.22);
+  border-radius: 999px;
+}
+.chat-thread-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Panneaux latéraux : pas de scroll interne */
+.chat-sidebar-panel {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 @media (max-width: 768px) {
@@ -262,17 +309,106 @@ body {
   }
 }
 
-.optima-chat-shell ::-webkit-scrollbar {
-  width: 8px;
+/* Ultra-fine scrollbar — semi-transparent on hover only */
+.chat-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
-
-.optima-chat-shell ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.45), rgba(100, 116, 139, 0.38));
-  border-radius: 999px;
-}
-
-.optima-chat-shell ::-webkit-scrollbar-track {
+.chat-scroll::-webkit-scrollbar-thumb {
   background: transparent;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+.chat-scroll:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(71, 85, 105, 0.16), rgba(148, 163, 184, 0.1));
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Thread canvas: subtle grain + depth (conversation area only) */
+.chat-thread-canvas {
+  position: relative;
+}
+.chat-thread-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.048;
+  background-image:
+    radial-gradient(rgba(15, 23, 42, 0.38) 0.45px, transparent 0.45px),
+    linear-gradient(125deg, rgba(52, 120, 103, 0.03) 0%, transparent 42%, rgba(99, 125, 168, 0.025) 100%);
+  background-size:
+    5px 5px,
+    100% 100%;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+.chat-thread-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, transparent 30%, transparent 70%, rgba(241, 245, 249, 0.72) 100%);
+}
+.chat-thread-canvas[data-thread-dark="1"]::before {
+  opacity: 0.042;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.12) 0.45px, transparent 0.45px),
+    linear-gradient(125deg, rgba(52, 120, 103, 0.05) 0%, transparent 45%, rgba(99, 125, 168, 0.04) 100%);
+  background-size: 5px 5px, 100% 100%;
+}
+.chat-thread-canvas[data-thread-dark="1"]::after {
+  opacity: 0.5;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 32%, transparent 68%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+/* Cinematic lighting helpers */
+.cinema-center::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(680px 420px at 50% 0%, rgba(255, 255, 255, 0.72), transparent 58%),
+    radial-gradient(900px 560px at 50% 55%, rgba(52, 120, 103, 0.04), transparent 62%),
+    radial-gradient(760px 520px at 50% 100%, rgba(99, 125, 168, 0.05), transparent 68%);
+  opacity: 0.42;
+  filter: blur(20px);
+}
+.cinema-center::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(closest-side at 50% 48%, transparent 55%, rgba(15, 23, 42, 0.028) 100%);
+  opacity: 0.9;
+}
+
+.message-glow {
+  position: relative;
+}
+.message-glow::before {
+  content: "";
+  position: absolute;
+  inset: -8px -14px;
+  border-radius: 24px;
+  pointer-events: none;
+  background:
+    radial-gradient(200px 120px at 35% 50%, rgba(52, 120, 103, 0.06), transparent 64%),
+    radial-gradient(220px 130px at 72% 45%, rgba(99, 125, 168, 0.05), transparent 66%);
+  opacity: 0;
+  transform: translateY(2px) scale(0.99);
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.message-glow:hover::before,
+.message-glow[data-active="true"]::before {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 /* Glass utilities */
@@ -291,7 +427,7 @@ body {
 
 /* Premium defaults */
 ::selection {
-  background: rgba(22, 163, 74, 0.22);
+  background: rgba(52, 120, 103, 0.18);
 }
 
 /* Subtle, premium interactions */
@@ -440,6 +576,8 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   touch-action: manipulation;
+  overflow: hidden;
+  height: 100dvh;
 }
 
 @supports (padding: max(0px)) {
@@ -481,7 +619,7 @@ body {
     content: "";
     position: absolute;
     inset: -2px;
-    background: linear-gradient(90deg, transparent, rgba(22, 163, 74, 0.18), rgba(59, 130, 246, 0.12), transparent);
+    background: linear-gradient(90deg, transparent, rgba(52, 120, 103, 0.08), rgba(99, 125, 168, 0.07), transparent);
     transform: translateX(-140%) skewX(-18deg);
     opacity: 0;
     pointer-events: none;

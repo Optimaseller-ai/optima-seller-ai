@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { ToastProvider, Toaster } from "@/components/ui/toaster";
 
@@ -45,18 +44,6 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        <Script id="strip-bis-skin-checked" strategy="beforeInteractive">
-          {`
-            (function () {
-              try {
-                var nodes = document.querySelectorAll('[bis_skin_checked]');
-                for (var i = 0; i < nodes.length; i++) {
-                  nodes[i].removeAttribute('bis_skin_checked');
-                }
-              } catch (e) {}
-            })();
-          `}
-        </Script>
         <div className="optima-bg" aria-hidden="true" />
         <ToastProvider>
           {children}

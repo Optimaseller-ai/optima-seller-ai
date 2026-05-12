@@ -1,92 +1,95 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ChevronLeft, Search, Volume2, VolumeX } from "lucide-react";
-
-type ConversationItem = {
-  slug: string;
-  businessName: string;
-  preview: string;
-  unread: number;
-  avatarUrl?: string;
-};
+import { memo, useMemo } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 
 type ChatSidebarProps = {
   businessName: string;
-  preview: string;
-  unread: number;
   avatarUrl: string;
   avatarOk: boolean;
   soundsOn: boolean;
-  currentSlug: string;
-  conversations: ConversationItem[];
-  onOpenConversation: (slug: string) => void;
+  status: string;
+  /** Micro-ligne « humaine » (ex. Répond rapidement) */
+  agentStatusHint?: string;
+  lastActiveLabel: string;
+  messages: Array<{ role: "user" | "assistant"; content: string; ts: string }>;
+  darkMode?: boolean;
   onToggleSounds: () => void;
 };
 
-export function ChatSidebar({
+function ChatSidebarComponent({
   businessName,
-  preview,
-  unread,
   avatarUrl,
   avatarOk,
   soundsOn,
-  currentSlug,
-  conversations,
-  onOpenConversation,
+  status,
+  agentStatusHint,
+  lastActiveLabel,
+  messages,
+  darkMode = false,
   onToggleSounds,
 }: ChatSidebarProps) {
-  const list = conversations.length
-    ? conversations
-    : [{ slug: currentSlug, businessName, preview: preview || "Conversation prete", unread, avatarUrl }];
+  const tags = useMemo(() => {
+    const joined = messages.map((m) => m.content.toLowerCase()).join(" ");
+    const out: string[] = [];
+    if (/\b(prix|tarif|combien)\b/.test(joined)) out.push("Prix");
+    if (/\b(stock|disponible)\b/.test(joined)) out.push("Stock");
+    if (/\b(livraison|adresse)\b/.test(joined)) out.push("Livraison");
+    if (/\b(payer|paiement|commande)\b/.test(joined)) out.push("Achat");
+    return out.slice(0, 4);
+  }, [messages]);
+
+  const tagLine = tags.length ? tags.join(" · ") : "—";
+
+  const cardBase = darkMode
+    ? "border-white/[0.06] bg-white/[0.03] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] ring-1 ring-white/[0.04]"
+    : "border-slate-900/[0.06] bg-white/55 shadow-[0_8px_28px_rgba(15,23,42,0.05)] ring-1 ring-slate-900/[0.03]";
+  const hoverLift = "transition duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(15,23,42,0.09)]";
 
   return (
-    <aside className="hidden w-[320px] shrink-0 border-r border-white/50 bg-white/60 p-4 backdrop-blur-2xl lg:block">
-      <div className="mb-5 flex items-center justify-between">
-        <button className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs text-slate-600">
-          <ChevronLeft className="h-3.5 w-3.5" />
-          Dashboard
-        </button>
-        <button onClick={onToggleSounds} className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 bg-white/80 text-slate-500">
-          {soundsOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-        </button>
+    <aside
+      className={`chat-sidebar-panel hidden h-full min-h-0 w-full min-w-0 shrink-0 flex-col gap-3 px-2.5 pb-6 pt-4 min-[1200px]:px-3 min-[1200px]:pt-5 lg:flex lg:flex-col ${
+        darkMode ? "text-slate-300" : "text-slate-600"
+      }`}
+    >
+      <div className={`rounded-xl border p-3 ${cardBase} ${hoverLift}`}>
+        <div className="flex items-start justify-between gap-2">
+          <p className={`min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug ${darkMode ? "text-slate-100" : "text-slate-900"}`}>
+            {businessName || "Prospect"}
+          </p>
+          <button
+            type="button"
+            onClick={onToggleSounds}
+            className={`grid h-7 w-7 shrink-0 place-items-center rounded-md transition duration-200 ${
+              darkMode ? "text-slate-400 hover:bg-white/[0.06] hover:text-slate-200" : "text-slate-500 hover:bg-slate-900/[0.05] hover:text-slate-800"
+            }`}
+            aria-label={soundsOn ? "Désactiver les sons" : "Activer les sons"}
+          >
+            {soundsOn ? <Volume2 className="h-[14px] w-[14px]" strokeWidth={1.75} /> : <VolumeX className="h-[14px] w-[14px]" strokeWidth={1.75} />}
+          </button>
+        </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-2xl border border-slate-100 bg-white/85 px-3 py-2">
-        <Search className="h-4 w-4 text-slate-400" />
-        <input placeholder="Rechercher une conversation" className="w-full bg-transparent text-xs outline-none placeholder:text-slate-400" />
+      <div className={`rounded-xl border p-3 ${cardBase} ${hoverLift}`}>
+        <div className="flex items-start gap-2">
+          <div className={`relative mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full ${darkMode ? "ring-1 ring-white/10" : "ring-1 ring-black/[0.06]"}`}>
+            {avatarOk ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
+            <span className={`absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full border border-white bg-[#4a9b86] ${darkMode ? "border-[#0c1018]" : ""}`} />
+          </div>
+          <p className="min-w-0 flex-1 break-words text-[11px] leading-snug">{status}</p>
+        </div>
+        {agentStatusHint ? (
+          <p className={`mt-1.5 break-words text-[10px] leading-snug ${darkMode ? "text-slate-500" : "text-slate-500"}`}>{agentStatusHint}</p>
+        ) : null}
+        <p className={`mt-2.5 break-words text-[11px] leading-relaxed ${darkMode ? "text-slate-400" : "text-slate-600"}`}>{lastActiveLabel}</p>
       </div>
 
-      <div className="space-y-2">
-        {list.map((c) => {
-          const active = c.slug === currentSlug;
-          return (
-            <motion.button
-              key={c.slug}
-              whileHover={{ y: -2 }}
-              onClick={() => onOpenConversation(c.slug)}
-              className={[
-                "w-full rounded-2xl p-3 text-left shadow-sm transition",
-                active ? "border border-emerald-100 bg-white/92" : "border border-slate-200/70 bg-white/80 hover:border-emerald-100",
-              ].join(" ")}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-9 w-9 overflow-hidden rounded-full border border-slate-200 bg-white">
-                    {c.avatarUrl ? <img src={c.avatarUrl} alt="" className="h-full w-full object-cover" /> : avatarOk ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : null}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{c.businessName}</p>
-                    <p className="text-[11px] text-slate-400">Service client</p>
-                  </div>
-                </div>
-                {c.unread > 0 ? <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-semibold text-white">{c.unread}</span> : null}
-              </div>
-              <p className="mt-2 truncate text-xs text-slate-500">{c.preview || "Conversation prete"}</p>
-            </motion.button>
-          );
-        })}
+      <div className={`rounded-xl border p-3 ${cardBase} ${hoverLift}`}>
+        <p className={`text-[10px] font-medium uppercase tracking-wide ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Signaux</p>
+        <p className={`mt-1.5 break-words text-[11px] leading-snug ${darkMode ? "text-slate-200" : "text-slate-800"}`}>{tagLine}</p>
       </div>
     </aside>
   );
 }
+
+export const ChatSidebar = memo(ChatSidebarComponent);

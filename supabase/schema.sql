@@ -234,3 +234,31 @@ drop policy if exists agents_update_own on public.agents;
 create policy "agents_select_own" on public.agents for select using (auth.uid() = user_id);
 create policy "agents_write_own" on public.agents for insert with check (auth.uid() = user_id);
 create policy "agents_update_own" on public.agents for update using (auth.uid() = user_id);
+
+-- Commercial persona per link (lucas|vanessa|cynthia|mark) + follow-up queue (see migrations/2026-05-09_commercial_agents_followups.sql)
+alter table public.agents add column if not exists persona_key text;
+
+-- Mémoire vendeur / prospect (JSON) sur les conversations chat public (idempotent)
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'conversations') then
+    execute 'alter table public.conversations add column if not exists conversation_state jsonb not null default ''{}''::jsonb';
+  end if;
+end $$;
+
+create table if not exists public.chat_links (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  agent_id uuid not null references public.agents (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists chat_links_slug_unique on public.chat_links (slug);
+create index if not exists chat_links_user_created_idx on public.chat_links (user_id, created_at desc);
+alter table public.chat_links enable row level security;
+drop policy if exists chat_links_select_own on public.chat_links;
+drop policy if exists chat_links_insert_own on public.chat_links;
+create policy "chat_links_select_own" on public.chat_links for select using (auth.uid() = user_id);
+create policy "chat_links_insert_own" on public.chat_links for insert with check (auth.uid() = user_id);
+
+-- Table `pending_agent_followups`: exécuter supabase/migrations/2026-05-09_commercial_agents_followups.sql après la table `conversations`.

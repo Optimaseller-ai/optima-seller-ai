@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { consumeOneGenerationOrThrow } from "@/lib/quota/consume";
 import { isModeAllowed, isResponseFormatAllowed, type PlanId } from "@/lib/plans/gates";
 
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   const raw = await req.json().catch(() => null);
   const parsed = chatCoreRequestSchema.safeParse(raw);

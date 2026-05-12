@@ -3,6 +3,8 @@ import { runChatCore, chatCoreRequestSchema } from "@/lib/ai/chat-core";
 import { createClient } from "@/lib/supabase/server";
 import { consumeOneGenerationOrThrow } from "@/lib/quota/consume";
 
+export const runtime = "nodejs";
+
 // Backward-compatible route used by existing clients.
 // All logic is delegated to the unified core engine.
 export async function POST(req: Request) {

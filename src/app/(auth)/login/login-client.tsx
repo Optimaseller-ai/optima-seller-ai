@@ -36,6 +36,8 @@ export function LoginClient() {
       business_type: string;
       city: string;
       country: string;
+      contact_phone?: string | null;
+      /** @deprecated Ancien format localStorage */
       whatsapp_number?: string | null;
       main_goal: string;
       brand_tone?: string;
@@ -55,6 +57,8 @@ export function LoginClient() {
     if (!data.user) return;
 
     const firstName = pending.full_name.trim().split(/\s+/)[0] ?? "";
+    const contactLine =
+      pending.contact_phone?.trim() || pending.whatsapp_number?.trim() || null;
     const payload = {
       id: data.user.id,
       full_name: pending.full_name,
@@ -62,7 +66,8 @@ export function LoginClient() {
       business_type: pending.business_type,
       country: pending.country,
       city: pending.city,
-      whatsapp_number: pending.whatsapp_number?.trim() ? pending.whatsapp_number.trim() : null,
+      whatsapp: contactLine,
+      whatsapp_number: contactLine,
       main_goal: pending.main_goal,
       brand_tone: pending.brand_tone ?? null,
       language: pending.language ?? null,

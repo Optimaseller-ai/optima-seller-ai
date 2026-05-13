@@ -23,11 +23,11 @@ export function HomeClient({ className }: { className: string }) {
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-navy)]/10 bg-white/70 px-3 py-1 text-xs text-[var(--brand-navy)]/80 shadow-sm">
                 <Sparkles className="size-3.5 text-[var(--brand-gold)]" />
-                Premium Africa Business • WhatsApp-first
+                Premium Africa Business • mobile-first
               </div>
 
               <h1 className="[font-family:var(--font-home-poppins),var(--font-home-inter),var(--font-sans)] text-3xl font-bold leading-[1.08] tracking-tight text-[var(--brand-navy)] sm:text-5xl">
-                Votre employé IA qui répond à vos clients et vend sur WhatsApp
+                Votre employé IA qui répond à vos clients et vend depuis le mobile
               </h1>
               <p className="max-w-xl text-base leading-relaxed text-[var(--brand-navy)]/75 sm:text-lg">
                 Répondez plus vite, rassurez vos prospects et transformez plus de conversations en ventes.
@@ -63,7 +63,7 @@ export function HomeClient({ className }: { className: string }) {
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--brand-navy)]/10 bg-white/70 px-3 py-1 shadow-sm">
                   <TrendingUp className="size-4 text-[var(--brand-navy)]" />
-                  Plus de ventes WhatsApp
+                  Plus de ventes via le chat
                 </span>
               </div>
             </div>
@@ -94,7 +94,7 @@ export function HomeClient({ className }: { className: string }) {
             />
             <Feature
               icon={Phone}
-              title="WhatsApp-first"
+              title="Mobile-first"
               desc="Pensé pour les vendeurs et e-commerçants africains."
               ctaLabel={u.isLoggedIn ? "Dashboard" : "Créer un compte"}
               ctaHref={u.isLoggedIn ? "/app" : "/signup"}
@@ -159,7 +159,7 @@ function SmartphoneMock() {
           </div>
           <div className="inline-flex items-center gap-1 rounded-full border border-[var(--brand-navy)]/10 bg-white px-2 py-1 text-[10px] font-medium text-[var(--brand-navy)]/70 shadow-sm">
             <MessageCircle className="size-3" />
-            WhatsApp
+            Chat
           </div>
         </div>
 

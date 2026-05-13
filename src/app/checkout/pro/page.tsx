@@ -31,7 +31,7 @@ export default function ProCheckoutPage() {
             </div>
 
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--brand-navy)] sm:text-4xl">
-              Passez Pro et <span className="text-[var(--brand-green)]">vendez plus sur WhatsApp</span>
+              Passez Pro et <span className="text-[var(--brand-green)]">convertissez plus sur le chat</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--brand-navy)]/65 sm:text-base">
               Réponses IA premium, relances automatiques, closing assisté, quota augmenté.

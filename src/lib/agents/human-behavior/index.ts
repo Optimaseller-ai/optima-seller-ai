@@ -1,6 +1,6 @@
 /**
  * Human Behavior Engine — cœur comportemental conversationnel (Seller AI).
- * Hors WhatsApp / UI / analytics : logique réutilisable côté serveur.
+ * Hors UI / analytics : logique réutilisable côté serveur.
  */
 
 export {

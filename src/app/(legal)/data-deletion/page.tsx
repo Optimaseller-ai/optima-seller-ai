@@ -28,7 +28,7 @@ export default function DataDeletionPage() {
           <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] text-[#111]/85">
             <li>Account name</li>
             <li>Email used</li>
-            <li>WhatsApp number</li>
+            <li>Phone number on file (if any)</li>
           </ul>
         </div>
 

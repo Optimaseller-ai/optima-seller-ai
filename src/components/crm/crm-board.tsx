@@ -135,7 +135,7 @@ export function CrmBoard({ initial }: { initial: Prospect[] }) {
         <CardHeader>
           <CardTitle>Astuce</CardTitle>
           <CardDescription>
-            Utilisez l&apos;onglet IA pour relancer un prospect et collez le message dans WhatsApp.
+            Utilisez l&apos;onglet IA pour relancer un prospect et copiez le message dans votre canal habituel (SMS, mail, etc.).
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">

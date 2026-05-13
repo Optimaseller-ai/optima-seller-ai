@@ -1,4 +1,4 @@
--- Remove WhatsApp integration tables/policies (Optima is now a proprietary web chat system)
+-- Drops legacy external messenger bridge tables if present (historical schema).
 
 do $$
 begin

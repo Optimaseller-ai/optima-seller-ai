@@ -93,7 +93,7 @@ export async function generateMessages(raw: unknown): Promise<GeneratorResponse>
       : "";
 
   const prompt = [
-    "Task: Generate 3 ready-to-send WhatsApp messages.",
+    "Task: Generate 3 ready-to-send sales messages (short, mobile-friendly).",
     "Return 3 variants that are different but consistent.",
     "Keep them copy-paste friendly.",
     "",

@@ -15,9 +15,6 @@ const envSchema = z.object({
 
   LEEKPAY_SECRET_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
   LEEKPAY_PUBLIC_KEY: optionalTrimmed.pipe(z.string().min(1).optional()),
-
-  /** Meta / WhatsApp Cloud API (webhooks, deauthorize, etc.) — optional until configured */
-  META_APP_SECRET: optionalTrimmed.pipe(z.string().min(1).optional()),
 });
 
 export const env = envSchema.parse({
@@ -29,6 +26,4 @@ export const env = envSchema.parse({
 
   LEEKPAY_SECRET_KEY: process.env.LEEKPAY_SECRET_KEY,
   LEEKPAY_PUBLIC_KEY: process.env.LEEKPAY_PUBLIC_KEY,
-
-  META_APP_SECRET: process.env.META_APP_SECRET,
 });

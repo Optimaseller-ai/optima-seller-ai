@@ -27,7 +27,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Optima Seller AI",
   description:
-    "L'IA qui génère des messages de vente WhatsApp pour les marchands africains.",
+    "L'IA qui génère des messages de vente pour les marchands africains (chat, mobile, boutique en ligne).",
   metadataBase: getMetadataBase(),
 };
 

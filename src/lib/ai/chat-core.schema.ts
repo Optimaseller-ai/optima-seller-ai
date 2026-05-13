@@ -41,7 +41,7 @@ export const chatCoreRequestSchema = z.object({
       businessType: z.string().nullable().optional(),
       country: z.string().nullable().optional(),
       city: z.string().nullable().optional(),
-      whatsapp: z.string().nullable().optional(),
+      contactPhone: z.string().nullable().optional(),
       mainGoal: z.string().nullable().optional(),
       brandTone: z.string().nullable().optional(),
       responseStyle: z.string().nullable().optional(),

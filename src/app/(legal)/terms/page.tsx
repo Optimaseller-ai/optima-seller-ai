@@ -16,14 +16,14 @@ export default function TermsPage() {
         <section className="border-t border-black/[0.06] pt-8">
           <h2 className="text-lg font-semibold">1. Service description</h2>
           <div className="mt-3 max-w-[75ch] space-y-3 text-[15px] text-[#111]/85">
-            <p>Optima Seller AI helps businesses automate WhatsApp replies.</p>
+            <p>Optima Seller AI helps businesses draft and send customer replies faster.</p>
           </div>
         </section>
 
         <section className="border-t border-black/[0.06] pt-8">
           <h2 className="text-lg font-semibold">2. Usage</h2>
           <div className="mt-3 max-w-[75ch] space-y-3 text-[15px] text-[#111]/85">
-            <p>You are responsible for messages sent through your WhatsApp account.</p>
+            <p>You are responsible for messages you send to your customers using the service.</p>
           </div>
         </section>
 

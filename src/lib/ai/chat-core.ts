@@ -165,7 +165,7 @@ function cleanAITone(text: string): string {
 }
 
 const SYSTEM_PROMPT = [
-  "You are a real human sales/customer service rep on WhatsApp for the business.",
+  "You are a real human sales/customer service rep for the business (mobile chat, short messages).",
   "You are never presented as a chatbot or generic AI assistant.",
   "",
   "═══════════════════════════════════════════════════════════════",
@@ -204,7 +204,7 @@ const SYSTEM_PROMPT = [
   "   - 'Je reste disponible.'",
   "   - 'Je vais faire de mon mieux.'",
   "   - 'Tu cherches des informations ?'",
-  "   Prefer a direct, human WhatsApp business reply (short, imperfect, natural).",
+  "   Prefer a direct, human mobile-chat reply (short, imperfect, natural).",
   "",
   "5️⃣  MAX LENGTH: 2 SHORT SENTENCES",
   "   Mobile-first and clear.",
@@ -325,7 +325,7 @@ function modeInstruction(mode: CoreMode) {
     case "promo":
       return [
         "MODE: Promotional message",
-        "Write like a real seller on Instagram/WhatsApp.",
+        "Write like a real seller on social / mobile chat.",
         "Engaging, clear CTA, brief.",
         "Make people WANT to engage.",
         "Use emojis naturally, not forced.",
@@ -396,7 +396,7 @@ function buildProfileContext(profile: BusinessProfile, opts?: { memoryLevel?: "l
     profile.mainGoal ? `Goal: ${profile.mainGoal}` : null,
     // Advanced memory extras
     isAdvanced && profile.ownerName ? `Owner name: ${profile.ownerName}` : null,
-    isAdvanced && profile.whatsapp ? `Business WhatsApp: ${profile.whatsapp}` : null,
+    isAdvanced && profile.contactPhone ? `Business contact line: ${profile.contactPhone}` : null,
     isAdvanced && profile.brandTone ? `Brand tone: ${profile.brandTone}` : null,
     isAdvanced && profile.responseStyle ? `Response style: ${profile.responseStyle}` : null,
     isAdvanced && profile.primaryLanguage ? `Primary language: ${profile.primaryLanguage}` : null,
@@ -463,7 +463,7 @@ async function loadBusinessProfileContext(opts?: {
         ? record.main_goal
         : null;
 
-    const whatsapp = isNonEmptyString(record.whatsapp)
+    const contactPhone = isNonEmptyString(record.whatsapp)
       ? record.whatsapp
       : isNonEmptyString(record.whatsapp_number)
         ? record.whatsapp_number
@@ -481,7 +481,7 @@ async function loadBusinessProfileContext(opts?: {
       businessType: isNonEmptyString(record.business_type) ? record.business_type : null,
       country: isNonEmptyString(record.country) ? record.country : null,
       city: isNonEmptyString(record.city) ? record.city : null,
-      whatsapp,
+      contactPhone,
       mainGoal,
       brandTone: null,
       responseStyle: null,
@@ -707,13 +707,13 @@ export async function runChatCore(raw: unknown): Promise<ChatCoreResponse> {
       ].join("\n")
     : [
         "Output format:",
-        "SINGLE message (not multiple). WhatsApp-style reply.",
+        "SINGLE message (not multiple). Short mobile-style reply.",
         "ULTRA SHORT: 1-2 small sentences. Less is more.",
         "Examples of perfect length:",
         "  ✅ 'Oui. On en a encore.'",
         "  ✅ 'Ah d'accord. C'est bon.'",
         "  ✅ 'Demain, c'est OK.'",
-        "Don't write paragraphs. Real humans on WhatsApp write short.",
+        "Don't write paragraphs. Real humans in chat write short.",
         "Emotion > Grammar. Reaction > Explanation.",
       ].join("\n");
 

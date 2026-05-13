@@ -19,8 +19,8 @@ export default function PrivacyPage() {
             <p>To provide Optima Seller AI, we may collect and process:</p>
             <ul className="list-disc space-y-2 pl-5">
               <li>Account name (for example the name provided in your profile).</li>
-              <li>Your WhatsApp number and identifiers required to connect WhatsApp Business.</li>
-              <li>WhatsApp messages (conversation content) to automate replies when enabled.</li>
+              <li>Contact phone you provide in your profile (optional).</li>
+              <li>Conversation content in Optima chat when you use the assistant.</li>
             </ul>
           </div>
         </section>
@@ -46,8 +46,7 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold">No third‑party data sharing</h2>
           <div className="mt-3 max-w-[75ch] space-y-3 text-[15px] text-[#111]/85">
             <p>
-              We do not sell your data. The WhatsApp integration requires technical exchanges with Meta services only to deliver the
-              features you enable.
+              We do not sell your data. Subprocessors (hosting, AI providers) receive only what is needed to run the features you use.
             </p>
           </div>
         </section>

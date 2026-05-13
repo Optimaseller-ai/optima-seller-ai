@@ -26,7 +26,7 @@ function normalizeProfileRow(row: Record<string, unknown>): ProfileRow {
       : typeof row.main_goal === "string"
         ? row.main_goal
         : null;
-  const whatsapp =
+  const contact_phone =
     typeof row.whatsapp === "string"
       ? row.whatsapp
       : typeof row.whatsapp_number === "string"
@@ -47,7 +47,7 @@ function normalizeProfileRow(row: Record<string, unknown>): ProfileRow {
     goal,
     country: typeof row.country === "string" ? row.country : null,
     city: typeof row.city === "string" ? row.city : null,
-    whatsapp,
+    contact_phone,
     offer,
     email: typeof row.email === "string" ? row.email : null,
     created_at: typeof row.created_at === "string" ? row.created_at : new Date(0).toISOString(),
@@ -168,7 +168,7 @@ export function useProfile(): UseProfileState {
       if (patch.goal !== undefined) payload.goal = patch.goal?.trim() ? patch.goal : null;
       if (patch.country !== undefined) payload.country = patch.country?.trim() ? patch.country : null;
       if (patch.city !== undefined) payload.city = patch.city?.trim() ? patch.city : null;
-      if (patch.whatsapp !== undefined) payload.whatsapp = patch.whatsapp?.trim() ? patch.whatsapp : null;
+      if (patch.contact_phone !== undefined) payload.whatsapp = patch.contact_phone?.trim() ? patch.contact_phone : null;
       if (patch.offer !== undefined) payload.offer = patch.offer?.trim() ? patch.offer : null;
       if (patch.email !== undefined) payload.email = patch.email?.trim() ? patch.email : null;
 
@@ -179,7 +179,7 @@ export function useProfile(): UseProfileState {
       }
       if (patch.business_name !== undefined) payload.shop_name = patch.business_name?.trim() ? patch.business_name : null;
       if (patch.goal !== undefined) payload.main_goal = patch.goal?.trim() ? patch.goal : null;
-      if (patch.whatsapp !== undefined) payload.whatsapp_number = patch.whatsapp?.trim() ? patch.whatsapp : null;
+      if (patch.contact_phone !== undefined) payload.whatsapp_number = patch.contact_phone?.trim() ? patch.contact_phone : null;
       if (patch.offer !== undefined) payload.offer_description = patch.offer?.trim() ? patch.offer : null;
 
       const { error: upsertErr } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });

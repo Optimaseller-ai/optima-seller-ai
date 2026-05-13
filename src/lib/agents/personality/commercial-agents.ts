@@ -104,7 +104,7 @@ export const COMMERCIAL_AGENTS: CommercialAgentDef[] = [
     id: "jordan",
     name: "Jordan",
     gender: "male",
-    role: "Conseiller WhatsApp",
+    role: "Conseiller messagerie mobile",
     avatar: portrait("photo-1599566150163-6419dad7579a"),
     statusTagline: "Dispo comme sur mobile",
     tone: "proche, rapide, ton conversationnel pro",

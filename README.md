@@ -1,6 +1,6 @@
 ## Optima Seller AI
 
-Mobile-first SaaS app to help African merchants sell better on WhatsApp using AI-generated sales messages (French-first).
+Mobile-first SaaS app to help African merchants sell better with AI-generated sales messages and chat tools (French-first).
 
 **Stack**
 - Next.js (App Router) + TypeScript

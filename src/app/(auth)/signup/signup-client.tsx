@@ -20,7 +20,7 @@ type SignupProfile = {
   business_type: string;
   country: string;
   city: string;
-  whatsapp_number: string;
+  contact_phone: string;
   main_goal: string;
   brand_tone: string;
   language: string;
@@ -32,7 +32,7 @@ const EMPTY: SignupProfile = {
   business_type: "",
   country: "",
   city: "",
-  whatsapp_number: "",
+  contact_phone: "",
   main_goal: "",
   brand_tone: "",
   language: "Français",
@@ -125,10 +125,10 @@ export function SignupClient() {
               goal: profile.main_goal,
               country: profile.country,
               city: profile.city,
-              whatsapp: profile.whatsapp_number.trim() ? profile.whatsapp_number.trim() : null,
+              whatsapp: profile.contact_phone.trim() ? profile.contact_phone.trim() : null,
               offer: null,
               email: data.user.email ?? null,
-              whatsapp_number: profile.whatsapp_number.trim() ? profile.whatsapp_number.trim() : null,
+              whatsapp_number: profile.contact_phone.trim() ? profile.contact_phone.trim() : null,
               main_goal: profile.main_goal,
               brand_tone: profile.brand_tone,
               language: profile.language,
@@ -298,9 +298,9 @@ export function SignupClient() {
                 />
               </div>
               <Field
-                label="WhatsApp"
-                value={profile.whatsapp_number}
-                onChange={(v) => setProfile((p) => ({ ...p, whatsapp_number: v }))}
+                label="Téléphone / messagerie"
+                value={profile.contact_phone}
+                onChange={(v) => setProfile((p) => ({ ...p, contact_phone: v }))}
                 placeholder="Ex: +241 0x xx xx xx"
                 helper="Optionnel — utile pour vos réponses."
               />

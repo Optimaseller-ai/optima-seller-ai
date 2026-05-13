@@ -70,7 +70,7 @@ export default function DashboardPage() {
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/70 px-3 py-1 text-xs font-medium text-[var(--brand-navy)]/70">
                 <span className="h-2 w-2 rounded-full bg-[var(--brand-green)] shadow-[0_0_0_4px_rgba(22,163,74,0.10)]" />
-                IA active • Réponses WhatsApp premium
+                IA active • Réponses premium sur le chat
               </div>
               <h1 className="text-2xl font-semibold tracking-tight text-[var(--brand-navy)] sm:text-3xl">
                 Bonjour{" "}

@@ -1240,7 +1240,7 @@ export default function ChatClient({
             .map((s) => s.trim())
             .filter(Boolean);
 
-    // Further split very long chunks to feel like multiple short WhatsApp messages.
+    // Further split very long chunks to feel like multiple short mobile messages.
     const exploded: string[] = [];
     for (const s of sentences) {
       const chunk = String(s ?? "").trim();
@@ -1316,7 +1316,7 @@ export default function ChatClient({
       playIncomingTick();
       triggerMobileHaptic(12);
       if (i < args.bubbles.length - 1) {
-        // Human cadence between multiple short messages (WhatsApp-like).
+        // Human cadence between multiple short messages (mobile chat).
         const byLen = bubble.length > 120 ? 420 : bubble.length > 70 ? 240 : 120;
         const gap = 420 + byLen + Math.round(Math.random() * 1050);
         await sleep(gap);
@@ -1724,7 +1724,7 @@ export default function ChatClient({
                     Bienvenue chez {sanitizeUiLabel(agentName)}
                   </p>
                   <p className={`mt-2 text-sm leading-relaxed ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
-                    {humanAgent.name} vous répond en quelques minutes — même esprit qu’une conversation WhatsApp pro.
+                    {humanAgent.name} vous répond en quelques minutes — ton proche du chat mobile.
                   </p>
                   <div className="mt-5 flex flex-wrap justify-center gap-2">
                     {["J’ai une question sur un produit", "Je cherche un prix", "Besoin d’un conseil"].map((s) => (
@@ -1765,7 +1765,7 @@ export default function ChatClient({
                 const isLastUser = m.role === "user" && m.id === [...displayedMessages].reverse().find((x) => x.role === "user")?.id;
                 const prev = idx > 0 ? displayedMessages[idx - 1] : null;
                 const next = idx < displayedMessages.length - 1 ? displayedMessages[idx + 1] : null;
-                // Smart message grouping (iMessage / WhatsApp desktop feel).
+                // Smart message grouping (mobile chat feel).
                 // Tight window: messages sent within a few seconds feel like one block.
                 const GROUP_WINDOW_MS = 9_000;
                 const grouped = !!prev && prev.role === m.role && diffMs(prev.ts, m.ts) <= GROUP_WINDOW_MS;

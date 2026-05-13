@@ -21,7 +21,7 @@ type ProfileForm = {
   goal: string;
   country: string;
   city: string;
-  whatsapp: string;
+  contact_phone: string;
   offer: string;
   email: string;
 };
@@ -33,7 +33,7 @@ const EMPTY: ProfileForm = {
   goal: "",
   country: "",
   city: "",
-  whatsapp: "",
+  contact_phone: "",
   offer: "",
   email: "",
 };
@@ -79,7 +79,7 @@ export function ProfileClient() {
       goal: remoteProfile.goal ?? "",
       country: remoteProfile.country ?? "",
       city: remoteProfile.city ?? "",
-      whatsapp: remoteProfile.whatsapp ?? "",
+      contact_phone: remoteProfile.contact_phone ?? "",
       offer: remoteProfile.offer ?? "",
       email: remoteProfile.email ?? "",
     });
@@ -102,7 +102,7 @@ export function ProfileClient() {
         goal: form.goal,
         country: form.country,
         city: form.city,
-        whatsapp: form.whatsapp,
+        contact_phone: form.contact_phone,
         offer: form.offer,
         email: form.email || accountEmail || undefined,
       });
@@ -124,7 +124,7 @@ export function ProfileClient() {
   }
 
   const completion = React.useMemo(() => {
-    const keys: (keyof ProfileForm)[] = ["full_name", "business_name", "business_type", "goal", "country", "city", "whatsapp", "offer"];
+    const keys: (keyof ProfileForm)[] = ["full_name", "business_name", "business_type", "goal", "country", "city", "contact_phone", "offer"];
     const filled = keys.filter((k) => String(form[k] ?? "").trim().length > 0).length;
     return Math.round((filled / keys.length) * 100);
   }, [form]);
@@ -188,7 +188,12 @@ export function ProfileClient() {
             <Field icon={Target} required label="Objectif principal" value={form.goal} onChange={(v) => setField("goal", v)} placeholder="Ex: +30% ventes" />
             <Field icon={Globe} required label="Pays" value={form.country} onChange={(v) => setField("country", v)} placeholder="Ex: Cameroun" />
             <Field icon={MapPin} required label="Ville" value={form.city} onChange={(v) => setField("city", v)} placeholder="Ex: YaoundÃ©" />
-            <Field label="WhatsApp" value={form.whatsapp} onChange={(v) => setField("whatsapp", v)} placeholder="+237..." />
+            <Field
+              label="Téléphone / messagerie"
+              value={form.contact_phone}
+              onChange={(v) => setField("contact_phone", v)}
+              placeholder="+237…"
+            />
             <Field label="Offre (produit/service + prix si possible)" value={form.offer} onChange={(v) => setField("offer", v)} placeholder="Ex: Packs skincare, livraison 24â€“48hâ€¦" />
             <Field
               label="Email"

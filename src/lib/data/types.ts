@@ -6,7 +6,8 @@ export type ProfileRow = {
   goal: string | null;
   country: string | null;
   city: string | null;
-  whatsapp: string | null;
+  /** Téléphone ou ligne de contact (synchronisé avec la table `profiles`) */
+  contact_phone: string | null;
   offer: string | null;
   email: string | null;
   created_at: string;

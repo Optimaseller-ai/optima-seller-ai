@@ -17,15 +17,15 @@ test("formatWhoAmIResponse uses profile fields when present", () => {
     businessType: "E-commerce",
     country: "Gabon",
     city: "Libreville",
-    whatsapp: "+241000000",
+    contactPhone: "+241000000",
     mainGoal: "Vendre plus",
     brandTone: null,
     responseStyle: null,
     primaryLanguage: "fr",
-    offer: "IA pour vendeurs WhatsApp",
+    offer: "IA commerciale pour PME",
   });
 
   assert.match(message, /Vous êtes Yuri\./);
   assert.match(message, /Votre business s['’]appelle Optima à Libreville\./);
-  assert.match(message, /Offre : IA pour vendeurs WhatsApp\./);
+  assert.match(message, /Offre : IA commerciale pour PME\./);
 });

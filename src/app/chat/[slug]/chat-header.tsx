@@ -5,7 +5,7 @@ import { ArrowLeft, Layers3, Moon, MoreHorizontal, Search, Sun, X } from "lucide
 
 type ChatHeaderProps = {
   agentName: string;
-  /** Métier affiché (ex. Service client, Conseiller WhatsApp) */
+  /** Métier affiché (ex. Service client, conseiller digital) */
   agentRole: string;
   businessName: string;
   agentAvatarUrl: string;

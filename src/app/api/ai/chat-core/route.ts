@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         businessType: typeof r.business_type === "string" ? r.business_type : null,
         country: typeof r.country === "string" ? r.country : null,
         city: typeof r.city === "string" ? r.city : null,
-        whatsapp: typeof r.whatsapp === "string" ? r.whatsapp : typeof r.whatsapp_number === "string" ? r.whatsapp_number : null,
+        contactPhone: typeof r.whatsapp === "string" ? r.whatsapp : typeof r.whatsapp_number === "string" ? r.whatsapp_number : null,
         mainGoal: typeof r.goal === "string" ? r.goal : typeof r.main_goal === "string" ? r.main_goal : null,
         brandTone: null,
         responseStyle: null,

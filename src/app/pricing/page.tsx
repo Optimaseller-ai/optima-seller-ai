@@ -21,7 +21,7 @@ export default function PricingPage() {
         <section className="space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--brand-navy)]/10 bg-white px-3 py-1 text-xs font-medium text-[var(--brand-navy)]/75 shadow-sm">
             <Sparkles className="size-3.5 text-[var(--brand-gold)]" />
-            Tarifs simples • WhatsApp-first
+            Tarifs simples • chat & mobile
           </div>
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="space-y-2">
@@ -55,7 +55,7 @@ export default function PricingPage() {
             badge="Le plus rentable"
             features={[
               "Quota élevé IA (2000 générations / mois)",
-              "Réponses automatiques WhatsApp 24h/24",
+              "Réponses automatiques sur le chat 24h/24",
               "Réponses premium closing",
               "Relance prospects intelligente",
               "Historique complet",
@@ -90,7 +90,7 @@ export default function PricingPage() {
             description="Pour volume + équipe + priorité."
             badge="Bientôt"
             features={[
-              "Auto replies WhatsApp",
+              "Réponses automatiques chat",
               "CRM + pipeline",
               "Relance prospects automatique",
               "Tagging leads + segments",
@@ -125,7 +125,7 @@ export default function PricingPage() {
           <div className="rounded-[var(--radius)] border border-[var(--brand-navy)]/10 bg-white p-5 text-[var(--brand-navy)] shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
             <div className="text-sm font-semibold">Rentabilisé dès 1 vente supplémentaire.</div>
             <div className="mt-1 text-sm text-[var(--brand-navy)]/65">
-              Une meilleure réponse WhatsApp peut suffire à convertir un prospect hésitant.
+              Une meilleure réponse client peut suffire à convertir un prospect hésitant.
             </div>
           </div>
         </section>
@@ -138,7 +138,7 @@ export default function PricingPage() {
 
           <div className="grid gap-3 lg:grid-cols-2">
             <FaqCard q="Puis-je annuler à tout moment ?" a="Oui. Vous gardez l’accès jusqu’à la fin de la période en cours." />
-            <FaqCard q="L’essai gratuit dure vraiment 7 jours ?" a="Oui, 7 jours complets pour tester l’outil dans vos conversations WhatsApp." />
+            <FaqCard q="L’essai gratuit dure vraiment 7 jours ?" a="Oui, 7 jours complets pour tester l’outil sur vos conversations clients." />
             <FaqCard q="Mobile Money arrive bientôt ?" a="Oui, c'est en préparation. Le paiement intégré arrive bientôt." />
             <FaqCard q="Puis-je changer de plan ?" a="Oui. Vous pouvez upgrader ou ajuster votre plan selon votre volume." />
           </div>

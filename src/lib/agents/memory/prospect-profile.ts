@@ -16,7 +16,7 @@ export type ProspectProfile = {
   genderConfidence?: number;
   /** fr | en | unknown */
   languageHint: "fr" | "en" | "unknown";
-  /** Formulations / habitudes notées (ex. « préfère WhatsApp ») */
+  /** Formulations / habitudes notées (ex. canal de contact préféré) */
   habits: string[];
   tonePreference: ProspectTonePreference;
   /** Phrases utilisateur marquantes (résumés courts) */
@@ -93,7 +93,7 @@ function detectLanguageHint(text: string): "fr" | "en" | null {
 function detectHabits(text: string): string[] {
   const t = norm(text);
   const out: string[] = [];
-  if (/whatsapp|watsapp|watsap/.test(t)) out.push("Préfère être contacté sur WhatsApp.");
+  if (/\b(par\s+message|messagerie|écris|envoyez[- ]moi|dm|inbox)\b/i.test(t)) out.push("Préfère être contacté par messagerie mobile.");
   if (/appel|appelez|téléphone|telephone|appellez moi/.test(t)) out.push("Demande d’appel vocal.");
   if (/plut[oô]t\s+le\s+matin|le\s+matin\s+c’est\s+mieux|prefer.*morning/i.test(text)) out.push("Disponible plutôt le matin.");
   if (/plut[oô]t\s+le\s+soir|apr[eè]s\s+18|after\s+6/i.test(text)) out.push("Disponible plutôt en fin de journée.");

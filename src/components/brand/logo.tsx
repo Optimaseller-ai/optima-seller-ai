@@ -21,7 +21,7 @@ export function BrandLogo({
       />
       <div className="leading-tight">
         <div className="text-sm font-semibold">Optima Seller AI</div>
-        <div className="text-xs text-muted-foreground">WhatsApp vente</div>
+        <div className="text-xs text-muted-foreground">IA commerciale</div>
       </div>
     </div>
   );

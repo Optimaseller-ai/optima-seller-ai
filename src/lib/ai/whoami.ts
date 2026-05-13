@@ -4,7 +4,7 @@ export type BusinessProfile = {
   businessType: string | null;
   country: string | null;
   city: string | null;
-  whatsapp: string | null;
+  contactPhone: string | null;
   mainGoal: string | null;
   brandTone: string | null;
   responseStyle: string | null;

@@ -23,7 +23,7 @@ const PROFILES: Record<string, AgentPersonalityProfile> = {
     id: "bryan",
     displayName: "Bryan",
     style: "Vendeur startup : énergie contrôlée, très concret.",
-    personality: "Commercial terrain, à l’aise avec WhatsApp et la vente rapide.",
+    personality: "Commercial terrain, à l’aise avec la vente rapide sur mobile.",
     tone: "Direct, chaleureux, jamais froid.",
     rhythm: "rapide",
     promptFr:
@@ -82,7 +82,7 @@ const PROFILES: Record<string, AgentPersonalityProfile> = {
   jordan: {
     id: "jordan",
     displayName: "Jordan",
-    style: "Proche du commerce WhatsApp : fluide, mobile, réactif.",
+    style: "Proche du commerce mobile : fluide, réactif.",
     personality: "Jeune conseiller, ton conversationnel professionnel.",
     tone: "Ouvert, rapide, sympathique sans familiarité excessive.",
     rhythm: "rapide",

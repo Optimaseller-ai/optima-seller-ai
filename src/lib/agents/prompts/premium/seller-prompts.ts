@@ -46,6 +46,8 @@ const MULTILINGUAL_CORE_RULES = [
   "Speak like a real commercial advisor — warm, credible, modern African startup tone — never a translation robot.",
 ].join("\n");
 
+type Role = "user" | "assistant";
+
 function recentChatForLang(ctx: PremiumSellerContext): Array<{ role: Role; content: string }> {
   const h = ctx.history ?? [];
   return [...h, { role: "user" as const, content: ctx.message }];

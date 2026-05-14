@@ -13,6 +13,8 @@ type ChatComposerProps = {
   onAttach: () => void;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  /** Scroll the in-app thread when the keyboard opens (avoid relying on `window` scroll in embedded / dvh layouts). */
+  onInputFocus?: () => void;
 };
 
 function iconHitClass(darkMode: boolean) {
@@ -21,7 +23,17 @@ function iconHitClass(darkMode: boolean) {
   }`;
 }
 
-export function ChatComposer({ input, sending, canSend, hasAttachment, darkMode = false, onAttach, onInputChange, onSend }: ChatComposerProps) {
+export function ChatComposer({
+  input,
+  sending,
+  canSend,
+  hasAttachment,
+  darkMode = false,
+  onAttach,
+  onInputChange,
+  onSend,
+  onInputFocus,
+}: ChatComposerProps) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -61,6 +73,7 @@ export function ChatComposer({ input, sending, canSend, hasAttachment, darkMode 
               value={input}
               onChange={(e) => onInputChange(e.target.value)}
               onFocus={() => {
+                onInputFocus?.();
                 window.setTimeout(() => {
                   window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
                 }, 110);

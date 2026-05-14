@@ -413,8 +413,17 @@ function getOrCreateSession(slug: string, persona?: CommercialAgentPublic | null
   return next;
 }
 
+/** Stable id so React keys survive re-hydration from disk (avoids full list remount / flicker). */
+function stableMessageId(m: StoredMessage): string {
+  let h = 0;
+  const c = String(m.content ?? "");
+  const s = `${m.ts}\0${m.role}\0${c.length}\0${c.slice(0, 4000)}`;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return `m_${(h >>> 0).toString(36)}_${c.length}`;
+}
+
 function toUiMessages(messages: StoredMessage[]): UiMessage[] {
-  return messages.map((m) => ({ ...m, id: crypto.randomUUID() }));
+  return messages.map((m) => ({ ...m, id: stableMessageId(m) }));
 }
 
 function initials(name: string) {
@@ -681,13 +690,31 @@ export default function ChatClient({
     return contextualStatus({ lastUserMessage: lastUser, officeStatus: office.status as any });
   }, [messages, office.status]);
 
+  const lastHydratedSlugRef = useRef<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
     if (!storedSession) return;
-    setMessages(toUiMessages(storedSession.messages));
+
+    const slugChanged = lastHydratedSlugRef.current !== slug;
+    lastHydratedSlugRef.current = slug;
+
+    const diskMsgs = storedSession.messages;
+    const diskCount = diskMsgs.length;
+    const localCount = messagesRef.current.filter((m) => !m.typing).length;
+
+    // Always reset when switching conversation; otherwise never replace UI with a *shorter* disk
+    // snapshot (stale session ref / race after persist would clear the thread on mobile).
+    const shouldTakeDisk =
+      slugChanged || (localCount === 0 && diskCount > 0) || (diskCount > localCount && diskCount > 0);
+
+    if (shouldTakeDisk) {
+      setMessages(toUiMessages(diskMsgs));
+    }
+
     setUnreadMap((prev) => ({ ...prev, [slug]: 0 }));
     setUnseenCount(0);
-  }, [storedSession]);
+  }, [storedSession, slug]);
 
   useEffect(() => {
     // Immersive mode for public chat (reduces "browser/SaaS" feeling).
@@ -806,7 +833,8 @@ export default function ChatClient({
       try {
         // Mark intro as done immediately to avoid double-firing on refresh.
         const nextState = { ...(state as any), intro_done: true, stats: { ...(state as any).stats, last_active_at: Date.now() } };
-        saveSession(slug, { ...storedSession, conversation_state: nextState });
+        const baseIntro = loadSession(slug) ?? storedSession;
+        saveSession(slug, { ...baseIntro, conversation_state: nextState });
 
         await sleep(700 + Math.round(Math.random() * 900));
         const typingId = crypto.randomUUID();
@@ -964,7 +992,7 @@ export default function ChatClient({
           let next = prev;
           for (const sm of toAdd) {
             next = next.concat({
-              id: crypto.randomUUID(),
+              id: stableMessageId(sm),
               role: "assistant",
               content: sm.content,
               ts: sm.ts,
@@ -1076,7 +1104,8 @@ export default function ChatClient({
   }
 
 	  function persistFromUi(ui: UiMessage[]) {
-	    const sess = storedSessionRef.current;
+	    // Always merge onto the latest disk snapshot so we never clobber messages with a stale React/ref session.
+	    const sess = loadSession(slug) ?? storedSessionRef.current;
 	    if (!sess) return;
 	    const persisted: StoredMessage[] = ui
 	      .filter((m) => !m.typing)
@@ -1218,8 +1247,9 @@ export default function ChatClient({
       const nextFatigue = clamp(0, (typeof stats.fatigue === "number" ? stats.fatigue : 0) - recover + addFatigue, 1);
       state.stats = { turn_count: turnCount + 1, fatigue: nextFatigue, last_active_at: Date.now() };
 
-      // Save back
-      saveSession(slug, { ...storedSession, conversation_state: state });
+      // Save back (fresh disk base — same race as post-reply conversation_state merge on mobile).
+      const baseState = loadSession(slug) ?? storedSession;
+      saveSession(slug, { ...baseState, conversation_state: state });
     } catch (e) {
       console.error("[CHAT] updateConversationStateWithUserMessage error", e);
     }
@@ -1312,9 +1342,10 @@ export default function ChatClient({
   async function emitAssistantBubbles(args: { bubbles: string[]; baseTsIso: string }) {
     for (let i = 0; i < args.bubbles.length; i++) {
       const bubble = args.bubbles[i]!;
-      const assistantId = crypto.randomUUID();
+      const ts = new Date().toISOString();
+      const assistantId = stableMessageId({ role: "assistant", content: bubble, ts });
       setMessages((prev) => {
-        const next = prev.concat({ id: assistantId, role: "assistant", content: bubble, ts: new Date().toISOString(), animateIn: "left" });
+        const next = prev.concat({ id: assistantId, role: "assistant", content: bubble, ts, animateIn: "left" });
         persistFromUi(next);
         return next;
       });
@@ -1580,7 +1611,7 @@ export default function ChatClient({
       setTypingVisible(false);
       await emitAssistantBubbles({ bubbles, baseTsIso: new Date().toISOString() });
       if (data?.conversation_state && typeof data.conversation_state === "object") {
-        const cur = storedSessionRef.current;
+        const cur = loadSession(slug) ?? storedSessionRef.current;
         if (cur) {
           saveSession(slug, {
             ...cur,
@@ -1639,10 +1670,10 @@ export default function ChatClient({
   };
 
   return (
-    <div className={`optima-chat-shell h-dvh overflow-hidden ${darkMode ? "bg-[#0a0d11]" : ""}`} style={accentStyle}>
-      <div className="mx-auto grid h-dvh w-full max-w-[2200px] grid-cols-1 lg:p-3 min-[1400px]:p-4">
+    <div className={`optima-chat-shell h-[100dvh] min-h-0 overflow-hidden ${darkMode ? "bg-[#0a0d11]" : ""}`} style={accentStyle}>
+      <div className="mx-auto grid h-[100dvh] min-h-0 w-full max-w-[2200px] grid-cols-1 lg:p-3 min-[1400px]:p-4">
         <div
-          className={`grid h-full w-full grid-cols-1 overflow-hidden transition-[grid-template-columns,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_minmax(0,11rem)] min-[1200px]:grid-cols-[minmax(0,11.75rem)_minmax(0,1fr)_minmax(0,11.75rem)] min-[1400px]:grid-cols-[minmax(0,12.25rem)_minmax(0,1fr)_minmax(0,12.25rem)] min-[1600px]:grid-cols-[minmax(0,12.75rem)_minmax(0,1fr)_minmax(0,12.75rem)] lg:rounded-xl lg:shadow-[0_1px_40px_rgba(15,23,42,0.04)] lg:ring-1 ${
+          className={`grid h-full min-h-0 w-full grid-cols-1 overflow-hidden transition-[grid-template-columns,padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_minmax(0,11rem)] min-[1200px]:grid-cols-[minmax(0,11.75rem)_minmax(0,1fr)_minmax(0,11.75rem)] min-[1400px]:grid-cols-[minmax(0,12.25rem)_minmax(0,1fr)_minmax(0,12.25rem)] min-[1600px]:grid-cols-[minmax(0,12.75rem)_minmax(0,1fr)_minmax(0,12.75rem)] lg:rounded-xl lg:shadow-[0_1px_40px_rgba(15,23,42,0.04)] lg:ring-1 ${
             darkMode ? "lg:ring-white/[0.05]" : "lg:ring-slate-900/[0.04]"
           }`}
         >
@@ -1662,7 +1693,7 @@ export default function ChatClient({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ type: "spring", stiffness: 180, damping: 26 }}
-          className={`cinema-center relative min-w-0 flex h-full flex-1 flex-col overflow-hidden rounded-none backdrop-blur-[18px] ${
+          className={`cinema-center relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-none backdrop-blur-[18px] ${
             darkMode ? "bg-[#0e1218]/88" : "bg-[linear-gradient(180deg,rgba(252,252,253,0.72)_0%,rgba(248,250,252,0.82)_40%,rgba(244,246,249,0.88)_100%)]"
           }`}
         >
@@ -1719,7 +1750,7 @@ export default function ChatClient({
                   darkMode ? "text-slate-100" : "text-slate-900"
                 }`}
               >
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }} className="relative z-[1] flex w-full flex-col gap-5 pb-8">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }} className="relative z-[1] flex w-full flex-col gap-5 pb-28 min-[480px]:pb-12 lg:pb-8">
               {visibleMessages.length === 0 ? (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
@@ -1983,6 +2014,11 @@ export default function ChatClient({
                 onAttach={() => fileRef.current?.click()}
                 onInputChange={setInput}
                 onSend={send}
+                onInputFocus={() => {
+                  window.requestAnimationFrame(() => {
+                    scrollThreadToBottom("smooth");
+                  });
+                }}
               />
             </div>
           </div>

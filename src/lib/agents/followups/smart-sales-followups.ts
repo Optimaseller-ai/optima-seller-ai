@@ -3,7 +3,7 @@
  * Style humain premium — pas d’assistant virtuel, pas de pression.
  */
 
-export function smartRelanceSystemPrompt(args: { agentDisplayName: string; businessLabel: string; lang: "fr" | "en" }) {
+export function smartRelanceSystemPrompt(args: { agentDisplayName: string; businessLabel: string; lang: "fr" | "en" | "es" }) {
   if (args.lang === "en") {
     return [
       `You are ${args.agentDisplayName}, a senior sales advisor at ${args.businessLabel}.`,
@@ -18,6 +18,22 @@ export function smartRelanceSystemPrompt(args: { agentDisplayName: string; busin
       "- Examples of spirit (do not copy): “Evening sir — I’m following up on the model you checked earlier.” / “It’s still available at the moment.”",
       "- At most ONE light question OR none.",
       "- No numbered lists, no corporate essay.",
+    ].join("\n");
+  }
+  if (args.lang === "es") {
+    return [
+      `Usted es ${args.agentDisplayName}, asesor comercial senior en ${args.businessLabel}.`,
+      "El prospecto se ha quedado en silencio en el chat.",
+      "",
+      "TAREA: enviar UN solo seguimiento breve (1–2 frases máximo).",
+      "",
+      "REGLAS:",
+      "- Humano, calmado, creíble. Sin palabras de IA ni bot.",
+      "- Sin spam, sin presión, sin urgencia falsa.",
+      "- Si es posible, ancle en un hecho del contexto (producto visto, stock, envío) usando SOLO la información proporcionada.",
+      "- Ejemplos de espíritu (no copiar): «Buenas noches señor — le escribo por el modelo que miró antes.» / «Por ahora sigue disponible.»",
+      "- Como máximo una pregunta ligera, o ninguna.",
+      "- Sin listas numeradas, sin ensayo corporativo.",
     ].join("\n");
   }
   return [
@@ -41,21 +57,26 @@ export function smartRelanceUserPrompt(args: {
   profileSummary: string;
   catalogueOrDocs: string;
   lastUserMessage: string;
-  lang: "fr" | "en";
+  lang: "fr" | "en" | "es";
 }) {
-  const head = args.lang === "en" ? "Write the follow-up message now." : "Rédigez la relance maintenant.";
+  const head =
+    args.lang === "en" ? "Write the follow-up message now." : args.lang === "es" ? "Escriba el mensaje de seguimiento ahora." : "Rédigez la relance maintenant.";
   return [
     head,
     "",
     args.relanceLabel,
     "",
-    args.lang === "en" ? "Business context:" : "Contexte business:",
+    args.lang === "en" ? "Business context:" : args.lang === "es" ? "Contexto del negocio:" : "Contexte business:",
     args.profileSummary || "—",
     "",
-    args.lang === "en" ? "Catalogue / docs:" : "Catalogue / documents:",
+    args.lang === "en" ? "Catalogue / docs:" : args.lang === "es" ? "Catálogo / documentos:" : "Catalogue / documents:",
     args.catalogueOrDocs || "—",
     "",
-    args.lang === "en" ? "Last prospect message (may be empty):" : "Dernier message prospect (peut être vide):",
+    args.lang === "en"
+      ? "Last prospect message (may be empty):"
+      : args.lang === "es"
+        ? "Último mensaje del prospecto (puede estar vacío):"
+        : "Dernier message prospect (peut être vide):",
     args.lastUserMessage || "—",
   ].join("\n");
 }

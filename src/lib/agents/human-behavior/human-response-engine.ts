@@ -1,12 +1,16 @@
 import "server-only";
 
 import { runAntiAiFilterPass } from "./anti-ai/anti-ai-filter";
-import { maybeSplitAssistantMessage } from "./conversation/message-splitting";
-import { maybeHumanMicroPrefix } from "./conversation/micro-behaviors";
+import { orchestrateHumanReply } from "./response-orchestrator";
 import { detectProspectEmotion } from "./emotions/emotion-detector";
+import {
+  inferConversationEmotionalTemperature,
+  maxReplyCharsForTemperature,
+} from "./emotions/conversation-emotion";
 import { softenArtificialEnthusiasm, stripCasualOpeners } from "./personality/professional-language";
 import { computeHumanResponseDelayMs, computeTypingDelayMs } from "./timing/human-timing-engine";
 import { buildBusinessTimeContext } from "./timing/time-context";
+import { filterAdvisorReplyHumanLikeness } from "./human-advisor-reply-filter";
 
 import type { SellerBehaviorConversationState } from "@/lib/agents/memory/conversation-state";
 
@@ -59,13 +63,33 @@ function applyEmojiPolicy(text: string, repliesSinceLastEmoji: number): string {
   return out;
 }
 
-function enforceShortMessengerShape(text: string): { text: string; wasShortened: boolean } {
+function enforceShortMessengerShape(text: string, maxChars = 420): { text: string; wasShortened: boolean } {
   let out = String(text ?? "").trim();
   const origLen = out.length;
   const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
   out = lines.slice(0, 3).join("\n");
-  if (out.length > 420) out = out.slice(0, 420).trim();
+  if (out.length > maxChars) out = out.slice(0, maxChars).trim();
   return { text: out, wasShortened: out.length < origLen || lines.length > 3 };
+}
+
+function clampReplyLengthForNegativeEmotion(
+  text: string,
+  userMsg: string,
+  emotion: ReturnType<typeof detectProspectEmotion>,
+): string {
+  const temp = inferConversationEmotionalTemperature(userMsg);
+  const max = maxReplyCharsForTemperature(temp);
+  if (emotion !== "anger" && emotion !== "frustration" && temp !== "frustré" && temp !== "irrité") return text;
+  if (text.length <= max) return text;
+  const chunks = text.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+  let acc = "";
+  for (const c of chunks) {
+    const next = acc ? `${acc} ${c}` : c;
+    if (next.length > max) break;
+    acc = next;
+  }
+  if (acc.trim().length >= 20) return acc.trim();
+  return text.slice(0, max).trim();
 }
 
 /**
@@ -74,6 +98,7 @@ function enforceShortMessengerShape(text: string): { text: string; wasShortened:
 export function runHumanResponseEngine(input: HumanResponseEngineInput): HumanResponseEngineResult {
   const userMsg = String(input.lastUserMessage ?? "");
   const emotion = detectProspectEmotion(userMsg);
+  const maxShape = maxReplyCharsForTemperature(inferConversationEmotionalTemperature(userMsg));
 
   const timeCtx = buildBusinessTimeContext({
     businessIanaTimezone: input.businessIanaTimezone,
@@ -87,15 +112,25 @@ export function runHumanResponseEngine(input: HumanResponseEngineInput): HumanRe
   out = stripCasualOpeners(out);
   out = softenArtificialEnthusiasm(out);
 
-  const shortPack = enforceShortMessengerShape(out);
+  const shortPack = enforceShortMessengerShape(out, maxShape);
   out = shortPack.text;
 
   out = applyEmojiPolicy(out, input.repliesSinceLastEmoji ?? 7);
-  out = maybeHumanMicroPrefix(out, input.microSeed ?? out);
 
-  const plan = maybeSplitAssistantMessage(out, input.microSeed ?? out);
+  const orchestrated = orchestrateHumanReply({
+    lastUserMessage: userMsg,
+    draftText: out,
+    microSeed: input.microSeed ?? out,
+    repliesSinceLastEmoji: input.repliesSinceLastEmoji ?? 7,
+    stateLanguage: input.conversationState?.language,
+  });
+  const plan = orchestrated.messagePlan;
   const usedMulti = plan.length > 1;
-  const text = usedMulti ? plan.join("\n\n") : out;
+  let text = orchestrated.text;
+  text = clampReplyLengthForNegativeEmotion(text, userMsg, emotion);
+
+  const humanPass = filterAdvisorReplyHumanLikeness({ reply: text, lastUserMessage: userMsg });
+  text = humanPass.text;
 
   const delay = computeHumanResponseDelayMs({
     prospectMessage: userMsg,

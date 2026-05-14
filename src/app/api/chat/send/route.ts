@@ -2,37 +2,54 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveBusinessTimezone } from "@/lib/ai/businessTimezoneResolver";
+import { detectConversationLanguage, type ConversationLanguage } from "@/lib/ai/language-detection";
 import { generateAIReply } from "@/lib/ai/business-context";
 import { followupDelayMs, isAgentHoldReply } from "@/lib/chat/agent-hold";
 import { resolvePublicPersonaForAgent } from "@/lib/chat/commercial-agents";
 import { detectStatusFromUserMessage, getNextRelanceAt, isClosedStatus } from "@/lib/chat/relance";
-import { isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";
+import {
+  conversationsInsertWithOptionalColumnFallback,
+  conversationsUpdateWithOptionalColumnFallback,
+  isMissingConversationStateColumn,
+} from "@/lib/chat/conversation-state-db";
 import { mergeSellerBehaviorStateAfterAssistant, mergeSellerBehaviorStateForUserTurn } from "@/lib/chat/seller-behavior-state";
 
 export const runtime = "nodejs";
 
-function detectLangFromMessageAndState(args: { message: string; stateLang?: "fr" | "en" }) {
-  const m = String(args.message ?? "").toLowerCase().trim();
-  if (args.stateLang === "en" || args.stateLang === "fr") return args.stateLang;
-  if (/\b(hello|hi|hey|good morning|good evening|how much|price|available|in stock|delivery|pay|payment)\b/i.test(m)) return "en" as const;
-  if (/\b(bonjour|bonsoir|svp|s'il vous plaît|combien|prix|disponible|livraison|payer|paiement)\b/i.test(m)) return "fr" as const;
-  return "fr" as const;
+function recentChatFromRequest(args: {
+  message: string;
+  clientHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+}): Array<{ role: "user" | "assistant"; content: string }> {
+  const tail = (Array.isArray(args.clientHistory) ? args.clientHistory : []).slice(-11).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  return [...tail, { role: "user" as const, content: args.message }];
 }
 
-function fb(lang: "fr" | "en") {
-  return lang === "en"
-    ? {
-        error: "Just a moment.",
-        noContext: "Hello. What model are you looking for?",
-        timeout: "One moment please.",
-        apiError: "Let me check that.",
-      }
-    : {
-        error: "Je vérifie.",
-        noContext: "Bonjour. Dites-moi juste le modèle que vous cherchez.",
-        timeout: "Un instant s'il vous plaît.",
-        apiError: "Je regarde cela.",
-      };
+function fb(lang: ConversationLanguage) {
+  if (lang === "en") {
+    return {
+      error: "Just a moment.",
+      noContext: "Hello. What model are you looking for?",
+      timeout: "One moment please.",
+      apiError: "Let me check that.",
+    };
+  }
+  if (lang === "es") {
+    return {
+      error: "Un momento, por favor.",
+      noContext: "Hola. ¿Qué modelo busca?",
+      timeout: "Un instante, por favor.",
+      apiError: "Un momento señor, estoy verificando eso.",
+    };
+  }
+  return {
+    error: "Je vérifie.",
+    noContext: "Bonjour. Dites-moi juste le modèle que vous cherchez.",
+    timeout: "Un instant s'il vous plaît.",
+    apiError: "Je regarde cela Monsieur.",
+  };
 }
 
 const BodySchema = z.object({
@@ -49,7 +66,7 @@ const BodySchema = z.object({
     .optional(),
   conversation_state: z
     .object({
-      language: z.enum(["fr", "en"]).optional(),
+      language: z.enum(["fr", "en", "es"]).optional(),
       preferences: z
         .object({
           blacklist: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
@@ -113,7 +130,12 @@ export async function POST(req: Request) {
   
   if (!parsed.success) {
     console.error("[API] Invalid schema:", parsed.error);
-    const lang = detectLangFromMessageAndState({ message: String((json as any)?.message ?? ""), stateLang: (json as any)?.conversation_state?.language });
+    const rawMsg = String((json as any)?.message ?? "");
+    const lang = detectConversationLanguage({
+      message: rawMsg,
+      previous: (json as any)?.conversation_state?.language,
+      history: typeof json === "object" && json ? recentChatFromRequest({ message: rawMsg, clientHistory: (json as any)?.history }) : undefined,
+    });
     return NextResponse.json({ success: true, reply: fb(lang).apiError, error: "INVALID_REQUEST" }, { status: 200 });
   }
 
@@ -128,9 +150,13 @@ export async function POST(req: Request) {
     history: clientHistory,
     conversation_state,
   } = parsed.data;
-  const lang = detectLangFromMessageAndState({ message, stateLang: conversation_state?.language });
-  const FALLBACK_ERROR_REPLY = fb(lang).error;
-  const FALLBACK_NO_CONTEXT_REPLY = fb(lang).noContext;
+
+  const earlyLang = detectConversationLanguage({
+    message,
+    previous: conversation_state?.language as ConversationLanguage | undefined,
+    history: recentChatFromRequest({ message, clientHistory }),
+  });
+  const earlyFb = fb(earlyLang);
 
   console.log("message reçu", message);
   console.log("agent_id", agent_id);
@@ -152,7 +178,7 @@ export async function POST(req: Request) {
     
     if (!agent?.id || !agent.is_active) {
       console.error("[API] Agent not found or inactive", { agent_id, found: !!agent });
-      return NextResponse.json({ success: true, reply: FALLBACK_ERROR_REPLY, error: "AGENT_NOT_FOUND" }, { status: 200 });
+      return NextResponse.json({ success: true, reply: earlyFb.error, error: "AGENT_NOT_FOUND" }, { status: 200 });
     }
     
     console.log("[API] Agent found:", { agent_id, user_id: agent.user_id, name: agent.name });
@@ -182,7 +208,12 @@ export async function POST(req: Request) {
     const conv = convRes.data;
 
     if (conv?.id) {
-      await admin.from("pending_agent_followups").delete().eq("conversation_id", conv.id);
+      try {
+        const { error: delFuErr } = await admin.from("pending_agent_followups").delete().eq("conversation_id", conv.id);
+        if (delFuErr) console.error("[CHAT_METADATA_UPDATE_FAILED] pending_agent_followups delete", delFuErr);
+      } catch (err) {
+        console.error("[CHAT_METADATA_UPDATE_FAILED] pending_agent_followups delete throw", err);
+      }
     }
 
     const persona = resolvePublicPersonaForAgent({ personaKey: (agent as any).persona_key, agentId: agent.id });
@@ -204,13 +235,23 @@ export async function POST(req: Request) {
     const mergedBase = { ...dbState, ...clientState } as Record<string, unknown>;
     if (!mergedBase.regionStyle && WAEMU.has(countryCode)) mergedBase.regionStyle = "west_africa";
 
+    const nowIso = new Date().toISOString();
+    const history = (Array.isArray(conv?.messages) ? (conv?.messages as any[]) : []) as StoredMessage[];
+    const historyMsgs =
+      Array.isArray(clientHistory) && clientHistory.length > 0
+        ? clientHistory.slice(-11).map((m) => ({ role: m.role, content: m.content }))
+        : history.slice(-11).map((m) => ({ role: m.role, content: m.content }));
+    const recentChatForMerge = [...historyMsgs, { role: "user" as const, content: message }];
+
     const { state: behaviorState, intent: detectedIntent } = mergeSellerBehaviorStateForUserTurn({
       previous: mergedBase,
       message,
+      recentChat: recentChatForMerge,
     });
 
-    const nowIso = new Date().toISOString();
-    const history = (Array.isArray(conv?.messages) ? (conv?.messages as any[]) : []) as StoredMessage[];
+    const lang = behaviorState.language ?? "en";
+    const FALLBACK_ERROR_REPLY = fb(lang).error;
+    const FALLBACK_NO_CONTEXT_REPLY = fb(lang).noContext;
     const nextHistory: StoredMessage[] = [...history, { role: "user", content: message, ts: nowIso }];
 
     const detectedStatus = detectStatusFromUserMessage(message);
@@ -218,8 +259,8 @@ export async function POST(req: Request) {
     let reply = FALLBACK_NO_CONTEXT_REPLY;
     try {
       const modelHistory = Array.isArray(clientHistory)
-        ? clientHistory.slice(-12)
-        : history.slice(-12).map((m) => ({ role: m.role, content: m.content }));
+        ? clientHistory.slice(-10)
+        : history.slice(-10).map((m) => ({ role: m.role, content: m.content }));
 
       const approxPromptExtraChars = message.length + modelHistory.reduce((n, m) => n + m.content.length, 0);
       console.log("[OPTIMA_AI_CHAT_SEND] generate_start", {
@@ -273,8 +314,10 @@ export async function POST(req: Request) {
         });
 
     let convId: string | null = conv?.id ?? null;
+    const preview = reply.slice(0, 120);
+    const aiIso = new Date().toISOString();
     if (!convId) {
-      const insertFull = {
+      const insertFull: Record<string, unknown> = {
         agent_id,
         session_id,
         messages: nextHistory as any,
@@ -282,55 +325,62 @@ export async function POST(req: Request) {
         status: statusNext,
         last_message_at: nowIso,
         last_user_message_at: nowIso,
-        last_ai_message_at: new Date().toISOString(),
+        last_ai_message_at: aiIso,
+        last_message_preview: preview,
         relance_count: 0,
         next_relance_at: shouldClose ? null : nextRelanceAt,
-        updated_at: new Date().toISOString(),
+        updated_at: aiIso,
       };
-      let { data: inserted, error: insErr } = await admin.from("conversations").insert(insertFull).select("id").maybeSingle();
-      if (insErr && isMissingConversationStateColumn(insErr)) {
-        console.warn("[API] Insert sans conversation_state (colonne absente — appliquer supabase/migrations/2026-05-11_conversation_seller_state.sql).");
-        const { conversation_state: _drop, ...insertBase } = insertFull;
-        ({ data: inserted, error: insErr } = await admin.from("conversations").insert(insertBase).select("id").maybeSingle());
+      try {
+        const { data: inserted, error: insErr } = await conversationsInsertWithOptionalColumnFallback(admin, insertFull);
+        if (insErr) console.error("[CHAT_METADATA_UPDATE_FAILED] conversations insert final", insErr);
+        convId = (inserted as { id?: string } | null)?.id ?? null;
+      } catch (err) {
+        console.error("[CHAT_METADATA_UPDATE_FAILED] conversations insert throw", err);
       }
-      if (insErr) console.error("[OPTIMA_AI_ERROR]", insErr);
-      convId = (inserted as any)?.id ?? null;
     } else {
-      const updateFull = {
+      const updateFull: Record<string, unknown> = {
         status: statusNext,
         last_message_at: nowIso,
         last_user_message_at: nowIso,
-        last_ai_message_at: new Date().toISOString(),
+        last_ai_message_at: aiIso,
+        last_message_preview: preview,
         relance_count: 0,
         next_relance_at: shouldClose ? null : nextRelanceAt,
         messages: nextHistory as any,
         conversation_state: conversationStateOut as any,
-        updated_at: new Date().toISOString(),
+        updated_at: aiIso,
       };
-      let { error: upErr } = await admin.from("conversations").update(updateFull).eq("id", convId);
-      if (upErr && isMissingConversationStateColumn(upErr)) {
-        console.warn("[API] Update sans conversation_state (colonne absente).");
-        const { conversation_state: _drop, ...updateBase } = updateFull;
-        ({ error: upErr } = await admin.from("conversations").update(updateBase).eq("id", convId));
+      try {
+        const { error: upErr } = await conversationsUpdateWithOptionalColumnFallback(admin, convId, updateFull);
+        if (upErr) console.error("[CHAT_METADATA_UPDATE_FAILED] conversations update final", upErr);
+      } catch (err) {
+        console.error("[CHAT_METADATA_UPDATE_FAILED] conversations update throw", err);
       }
-      if (upErr) console.error("[OPTIMA_AI_ERROR]", upErr);
     }
 
     if (convId && isAgentHoldReply(reply)) {
-      const { error: fuErr } = await admin.from("pending_agent_followups").insert({
-        conversation_id: convId,
-        scheduled_for: new Date(Date.now() + followupDelayMs(detectedIntent)).toISOString(),
-        status: "pending",
-        payload: { lastUserMessage: message, lang, conversationState: conversationStateOut, personaKey: (agent as any).persona_key ?? persona.id },
-      } as any);
-      if (fuErr) console.error("[OPTIMA_AI_ERROR] pending_agent_followups", fuErr);
+      try {
+        const { error: fuErr } = await admin.from("pending_agent_followups").insert({
+          conversation_id: convId,
+          scheduled_for: new Date(Date.now() + followupDelayMs(detectedIntent)).toISOString(),
+          status: "pending",
+          payload: { lastUserMessage: message, lang, conversationState: conversationStateOut, personaKey: (agent as any).persona_key ?? persona.id },
+        } as any);
+        if (fuErr) console.error("[CHAT_METADATA_UPDATE_FAILED] pending_agent_followups insert", fuErr);
+      } catch (err) {
+        console.error("[CHAT_METADATA_UPDATE_FAILED] pending_agent_followups insert throw", err);
+      }
     }
 
     return NextResponse.json({ success: true, reply, conversation_state: conversationStateOut }, { status: 200 });
   } catch (e) {
     console.error("[OPTIMA_AI_ERROR]", e);
     console.error("[API] Unexpected error:", { message: (e as any)?.message ?? String(e), stack: (e as any)?.stack });
-    const lang = detectLangFromMessageAndState({ message: "", stateLang: (json as any)?.conversation_state?.language });
+    const lang = detectConversationLanguage({
+      message: "",
+      previous: (json as any)?.conversation_state?.language as ConversationLanguage | undefined,
+    });
     return NextResponse.json({ success: true, reply: fb(lang).error, error: "INTERNAL_ERROR" }, { status: 200 });
   }
 }

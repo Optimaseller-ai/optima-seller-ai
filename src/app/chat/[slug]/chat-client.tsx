@@ -18,6 +18,8 @@ import {
   type CommercialAgentPublic,
 } from "@/lib/chat/commercial-agents";
 import type { ProspectTone, SellerBehaviorConversationState } from "@/lib/chat/seller-behavior-types";
+import { detectConversationLanguage } from "@/lib/ai/language-detection";
+import { clientEmotionalPauseBoost, inferConversationEmotionalTemperature } from "@/lib/agents/human-behavior/emotions/conversation-emotion";
 
 type StoredMessage = {
   role: "user" | "assistant";
@@ -195,16 +197,39 @@ function detectTalkativeUserMessage(userMessage: string) {
   return msg.length >= 170 || wc >= 30;
 }
 
-function detectDominantLanguage(args: { message: string; previous?: "fr" | "en" }): "fr" | "en" {
-  const msg = String(args.message ?? "").trim().toLowerCase();
-  if (!msg) return args.previous ?? "fr";
-  if (/\b(hello|hi|hey|good morning|good evening|good afternoon|how much|how much is|price|available|in stock|delivery|pay|payment)\b/i.test(msg)) return "en";
-  if (/\b(bonjour|bonsoir|svp|s'il vous plaît|s il vous plait|combien|prix|disponible|livraison|payer|paiement)\b/i.test(msg)) return "fr";
+type ChatUiLang = "fr" | "en" | "es";
 
-  const en = msg.match(/\b(the|a|an|and|or|with|for|to|from|of|in|on|at|is|are|we|you|your|sir|madam|please|thanks|thank)\b/gi)?.length ?? 0;
-  const fr = msg.match(/\b(le|la|les|un|une|des|et|ou|avec|pour|de|du|dans|sur|chez|est|sont|nous|vous|votre|monsieur|madame|s'il|merci)\b/gi)?.length ?? 0;
-  if (en === fr) return args.previous ?? "fr";
-  return en > fr ? "en" : "fr";
+function pickClientHoldReply(lang: ChatUiLang): string {
+  const fr = ["Je regarde cela.", "Un instant s'il vous plaît.", "Je vérifie."];
+  const en = ["Just a moment.", "Let me check that.", "One moment please."];
+  const es = ["Un momento señor, estoy verificando eso.", "Un instante, por favor.", "Le confirmo en seguida."];
+  const xs = lang === "en" ? en : lang === "es" ? es : fr;
+  return xs[Math.floor(Math.random() * xs.length)]!;
+}
+
+function pickServiceInterlude(args: { lang: ChatUiLang; style: "direct" | "reassuring" }) {
+  if (args.lang === "en") {
+    const direct = ["One moment.", "Let me check.", "Alright, checking now."];
+    const reassuring = ["One moment please.", "I’m checking that for you.", "Thanks for your patience."];
+    const xs = args.style === "reassuring" ? reassuring : direct;
+    return xs[Math.floor(Math.random() * xs.length)]!;
+  }
+  if (args.lang === "es") {
+    const direct = ["Un momento.", "Estoy mirando eso.", "Vale, reviso."];
+    const reassuring = ["Un momento por favor.", "Estoy verificando eso para usted.", "Gracias por su paciencia."];
+    const xs = args.style === "reassuring" ? reassuring : direct;
+    return xs[Math.floor(Math.random() * xs.length)]!;
+  }
+  const direct = ["Un instant.", "Je vérifie.", "Très bien, je regarde."];
+  const reassuring = ["Un instant, je vérifie pour vous.", "Je regarde cela avec attention.", "Merci pour votre patience."];
+  const xs = args.style === "reassuring" ? reassuring : direct;
+  return xs[Math.floor(Math.random() * xs.length)]!;
+}
+
+function uiLangFromConversationState(state: unknown): ChatUiLang {
+  const l = (state && typeof state === "object" ? (state as { language?: string }).language : undefined) ?? "fr";
+  if (l === "en" || l === "es") return l;
+  return "fr";
 }
 
 function computeReadDelayMs(args: { userMessage: string; fatigue01: number; profileTone?: ProspectTone }) {
@@ -282,31 +307,6 @@ async function ensureMinTypingPauseBeforeFallback(elapsedTypingMs: number) {
   const target = randBetween(8000, 15000);
   const wait = Math.max(0, target - elapsedTypingMs);
   if (wait > 0) await sleep(wait);
-}
-
-function pickClientHoldReply(lang: "fr" | "en"): string {
-  const fr = ["Je regarde cela.", "Un instant s'il vous plaît.", "Je vérifie."];
-  const en = ["Just a moment.", "Let me check that.", "One moment please."];
-  const xs = lang === "en" ? en : fr;
-  return xs[Math.floor(Math.random() * xs.length)]!;
-}
-
-function pickServiceInterlude(args: { lang: "fr" | "en"; style: "direct" | "reassuring" }) {
-  if (args.lang === "en") {
-    const direct = ["One moment.", "Let me check.", "Alright, checking now."];
-    const reassuring = ["One moment please.", "I’m checking that for you.", "Thanks for your patience."];
-    const xs = args.style === "reassuring" ? reassuring : direct;
-    return xs[Math.floor(Math.random() * xs.length)]!;
-  }
-  const direct = ["Un instant.", "Je vérifie.", "Très bien, je regarde."];
-  const reassuring = ["Un instant, je vérifie pour vous.", "Je regarde cela avec attention.", "Merci pour votre patience."];
-  const xs = args.style === "reassuring" ? reassuring : direct;
-  return xs[Math.floor(Math.random() * xs.length)]!;
-}
-
-function uiLangFromConversationState(state: unknown): "fr" | "en" {
-  if (state && typeof state === "object" && (state as { language?: string }).language === "en") return "en";
-  return "fr";
 }
 
 function loadSession(slug: string): StoredChatSession | null {
@@ -1110,7 +1110,12 @@ export default function ChatClient({
         tone_mode: "conversation_naturelle",
         stats: { turn_count: 0, fatigue: 0, last_active_at: Date.now() },
       };
-      state.language = detectDominantLanguage({ message: userMessage, previous: state.language });
+      const recent = storedSession.messages.slice(-11).map((m) => ({ role: m.role, content: m.content }));
+      state.language = detectConversationLanguage({
+        message: userMessage,
+        previous: state.language,
+        history: [...recent, { role: "user" as const, content: userMessage }],
+      });
       const blacklist = Array.isArray(state.preferences?.blacklist) ? state.preferences!.blacklist! : [];
       const m = userMessage.toLowerCase();
       if (/(arr[eê]te|stop).*(demander|pose).*(services|infos|informations)/.test(m)) {
@@ -1396,10 +1401,11 @@ export default function ChatClient({
       const startTime = Date.now();
       
       // Human read + think + typing are independent from backend latency.
-      const readDelay = computeReadDelayMs({ userMessage: message, fatigue01, profileTone });
-      const thinkDelay = computeThinkDelayMs(message, { profileTone });
-      const pauseAfterRead = 280 + Math.round(Math.random() * 750); // small "processing" pause after "vu"
-      const minTypingBeforeReply = 1200 + Math.round(Math.random() * 1200);
+      const pauseBoost = clientEmotionalPauseBoost(message);
+      const readDelay = Math.round(computeReadDelayMs({ userMessage: message, fatigue01, profileTone }) * pauseBoost);
+      const thinkDelay = Math.round(computeThinkDelayMs(message, { profileTone }) * Math.min(1.22, pauseBoost));
+      const pauseAfterRead = Math.round((280 + Math.round(Math.random() * 750)) * Math.min(1.15, pauseBoost));
+      const minTypingBeforeReply = Math.round((1200 + Math.round(Math.random() * 1200)) * pauseBoost);
 
       // Kick off backend request immediately, but we won't show typing instantly.
       // Simulated upload/progress for images (keeps it "app-like" and not instant/robotic).
@@ -1461,9 +1467,11 @@ export default function ChatClient({
           /(comment|pourquoi|livraison|adresse|paiement|payer|garantie|retour|échange|remboursement|taille|couleur|disponible|stock|compar|moins cher|budget|max)/i.test(
             message,
           );
+        const emotionalTemp = inferConversationEmotionalTemperature(message);
+        const skipInterlude = emotionalTemp === "frustré" || emotionalTemp === "irrité";
         const style = humanAgent.personality === "chaleureux" ? ("reassuring" as const) : ("direct" as const);
         const chance = complex ? 0.32 : msgLen < 18 ? 0.08 : 0.14;
-        if (Math.random() < chance) {
+        if (!skipInterlude && Math.random() < chance) {
           const langUi = uiLangFromConversationState(storedSession?.conversation_state);
           const b1 = pickServiceInterlude({ lang: langUi, style });
           await emitAssistantBubbles({ bubbles: [b1], baseTsIso: new Date().toISOString() });
@@ -1561,7 +1569,9 @@ export default function ChatClient({
 
       // Keep typing visible long enough to avoid "robot instant answers".
       const typingMode = reply.length <= 90 ? "short" : reply.length <= 260 ? "sales" : "long";
-      const desiredTyping = computeTypingDurationMs({ reply, mode: typingMode, fatigue01, rushed, profileTone });
+      const desiredTyping = Math.round(
+        computeTypingDurationMs({ reply, mode: typingMode, fatigue01, rushed, profileTone }) * pauseBoost,
+      );
       const elapsedTyping = Date.now() - typingVisibleAt;
       const remainingTyping = Math.max(0, Math.max(minTypingBeforeReply, desiredTyping) - elapsedTyping);
       if (remainingTyping) await sleep(remainingTyping);

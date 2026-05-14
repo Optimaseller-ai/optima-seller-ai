@@ -13,9 +13,11 @@ import {
   type PremiumSellerProfile,
 } from "@/lib/agents/prompts/premium/seller-prompts";
 import type { SellerBehaviorConversationState } from "@/lib/agents/memory/conversation-state";
+import { detectProspectTurnIntent, salesOpportunityAllowedForIntent } from "@/lib/agents/human-behavior/response-orchestrator";
+import { prospectExplicitlyRefusesOrder } from "@/lib/agents/human-behavior/emotions/conversation-emotion";
 import { runSalesOpportunityEngine } from "@/lib/agents/sales/opportunity-engine";
 
-const MAX_HISTORY_MESSAGES = 12;
+const MAX_HISTORY_MESSAGES = 10;
 const MAX_CATALOG_PRODUCTS = 6;
 const MATCH_CHUNKS_COUNT = 6;
 const CONTEXT_CACHE_TTL_MS = 45_000;
@@ -250,17 +252,21 @@ export async function generateAIReply(args: {
   }
 
   const langForSales = detectDominantLanguage({ message, previous: args.conversationState?.language });
-  const salesOpp = runSalesOpportunityEngine({
-    message,
-    history,
-    conversationProfile: args.conversationState?.conversationProfile,
-    productMemory: args.conversationState?.productMemory,
-    commercialMemory: args.conversationState?.commercialMemory,
-    lastIntent: args.conversationState?.lastSellerIntent,
-    productsText: topProducts,
-  });
-  const salesOpportunityBlock =
-    args.followupAfterHold === true ? undefined : langForSales === "en" ? salesOpp.promptBlockEn : salesOpp.promptBlockFr;
+  const prospectTurnIntent = detectProspectTurnIntent(message);
+
+  let salesOpportunityBlock: string | undefined;
+  if (!args.followupAfterHold && salesOpportunityAllowedForIntent(prospectTurnIntent) && !prospectExplicitlyRefusesOrder(message)) {
+    const salesOpp = runSalesOpportunityEngine({
+      message,
+      history,
+      conversationProfile: args.conversationState?.conversationProfile,
+      productMemory: args.conversationState?.productMemory,
+      commercialMemory: args.conversationState?.commercialMemory,
+      lastIntent: args.conversationState?.lastSellerIntent,
+      productsText: topProducts,
+    });
+    salesOpportunityBlock = langForSales === "en" ? salesOpp.promptBlockEn : salesOpp.promptBlockFr;
+  }
 
   const systemPrompt = buildPremiumSystemPrompt(sellerProfile, {
     message,
@@ -271,6 +277,7 @@ export async function generateAIReply(args: {
     productsText: topProducts,
     chunksText: topChunks,
     salesOpportunityBlock,
+    prospectTurnIntent,
   });
   const userPrompt = buildPremiumUserPrompt(sellerProfile, {
     message,
@@ -281,6 +288,7 @@ export async function generateAIReply(args: {
     productsText: topProducts,
     chunksText: topChunks,
     salesOpportunityBlock,
+    prospectTurnIntent,
   });
 
   const promptChars = systemPrompt.length + userPrompt.length;

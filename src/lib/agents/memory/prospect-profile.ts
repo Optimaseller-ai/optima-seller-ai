@@ -204,7 +204,9 @@ export function frenchSalutationForLocalTime(dt: DateTime): FrenchSalutation {
       ? { phraseFr: "Bon après-midi", alternateFr: "Bonjour", slot }
       : { phraseFr: "Bonjour", alternateFr: "Bon après-midi", slot };
   }
-  return { phraseFr: "Bonsoir", slot };
+  if (slot === "evening") return { phraseFr: "Bonsoir", slot };
+  /* nuit 00h00–04h59 : éviter « bonne après-midi » / « bon après-midi » ; ton conseiller présent même tard. */
+  return { phraseFr: "Bonjour", slot };
 }
 
 /** Ce que le prospect exprime comme salutation explicite (message analysé tel quel). */
@@ -284,7 +286,18 @@ export function englishSalutationForLocalTime(dt: DateTime): { phraseEn: string;
   const slot = greetingSlotFromLocalHour(hour, minute);
   if (slot === "morning") return { phraseEn: "Good morning", slot };
   if (slot === "afternoon") return { phraseEn: "Good afternoon", slot };
-  return { phraseEn: "Good evening", slot };
+  if (slot === "evening") return { phraseEn: "Good evening", slot };
+  return { phraseEn: "Hello", slot };
+}
+
+export function spanishSalutationForLocalTime(dt: DateTime): { phraseEs: string; slot: GreetingSlot } {
+  const hour = dt.hour;
+  const minute = dt.minute;
+  const slot = greetingSlotFromLocalHour(hour, minute);
+  if (slot === "morning") return { phraseEs: "Buenos días", slot };
+  if (slot === "afternoon") return { phraseEs: "Buenas tardes", slot };
+  if (slot === "evening") return { phraseEs: "Buenas noches", slot };
+  return { phraseEs: "Hola", slot };
 }
 
 export function frenchHonorific(pp: ProspectProfile | undefined): "Monsieur" | "Madame" | "Mademoiselle" | null {
@@ -318,10 +331,28 @@ export function englishHonorificSmart(pp: ProspectProfile | undefined): "sir" | 
   return null;
 }
 
-export function formatProspectProfilePromptBlock(pp: ProspectProfile | undefined, lang: "fr" | "en"): string | null {
+/** Señor / señora — mêmes règles de confiance que l’anglais. */
+export function spanishHonorificSmart(pp: ProspectProfile | undefined): "Señor" | "Señora" | null {
+  if (!pp) return null;
+  if (pp.civility === "monsieur") return "Señor";
+  if (pp.civility === "madame" || pp.civility === "mademoiselle") return "Señora";
+  if ((pp.genderConfidence ?? 0) < 80) return null;
+  if (pp.inferredGender === "male") return "Señor";
+  if (pp.inferredGender === "female") return "Señora";
+  return null;
+}
+
+export function formatProspectProfilePromptBlock(pp: ProspectProfile | undefined, lang: "fr" | "en" | "es"): string | null {
   if (!pp) return null;
   const lines: string[] = [];
-  if (lang === "en") {
+  if (lang === "es") {
+    if (pp.displayName) lines.push(`Nombre o presentación del prospecto: ${pp.displayName}.`);
+    if (pp.civility !== "unknown") lines.push(`Tratamiento preferido (referencia interna): ${pp.civility}.`);
+    if (pp.languageHint !== "unknown") lines.push(`Hábito de idioma: ${pp.languageHint}.`);
+    if (pp.tonePreference !== "unknown") lines.push(`Preferencia de tono: ${pp.tonePreference}.`);
+    if (pp.habits.length) lines.push(`Hábitos anotados:\n- ${pp.habits.join("\n- ")}`);
+    if (pp.historySnippets.length) lines.push(`Frases recientes (no copiar literalmente):\n- ${pp.historySnippets.slice(0, 3).join("\n- ")}`);
+  } else if (lang === "en") {
     if (pp.displayName) lines.push(`Prospect first name or how they introduced themselves: ${pp.displayName}.`);
     if (pp.civility !== "unknown") lines.push(`Preferred title: ${pp.civility}.`);
     if (pp.languageHint !== "unknown") lines.push(`Language habit: ${pp.languageHint}.`);

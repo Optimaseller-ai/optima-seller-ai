@@ -6,20 +6,50 @@ import { agentBehaviorPromptFr } from "@/lib/agents/personality/persona-prompts"
 import { formatBusinessLocalDateTime } from "@/lib/agents/timing/business-timezone";
 import {
   detectProspectExplicitFrenchGreeting,
-  englishSalutationForLocalTime,
   formatProspectProfilePromptBlock,
   englishHonorificSmart,
   frenchHonorificSmart,
-  frenchSalutationForLocalTime,
+  spanishHonorificSmart,
   greetingSlotFromLocalHour,
   resolveFrenchOpeningPhrase,
 } from "@/lib/agents/memory/prospect-profile";
 import { ANTI_AI_PHRASE_BLACKLIST } from "@/lib/agents/human-behavior/anti-ai/phrase-blacklist";
+import {
+  buildConversationStateEngineSnapshot,
+  formatConversationStateEnginePromptBlock,
+  tryHumanizedGreetingQuickReply,
+} from "@/lib/agents/human-behavior/conversation-state-engine";
 import { runHumanResponseEngine } from "@/lib/agents/human-behavior/human-response-engine";
+import {
+  buildPersonalWellbeingQuickReply,
+  detectProspectTurnIntent,
+  formatTurnIntentOrchestratorBlock,
+  isPersonalWellbeingTurn,
+  type ProspectTurnIntent,
+} from "@/lib/agents/human-behavior/response-orchestrator";
+import { detectDominantLanguage, norm, type SellerLanguage } from "@/lib/agents/seller-language";
+import {
+  formatEmotionalTemperaturePromptBlock,
+  inferConversationEmotionalTemperature,
+  type SellerPromptLangHint,
+} from "@/lib/agents/human-behavior/emotions/conversation-emotion";
 
-type Role = "user" | "assistant";
+export type { SellerLanguage } from "@/lib/agents/seller-language";
+export { detectDominantLanguage, norm } from "@/lib/agents/seller-language";
 
-export type SellerLanguage = "fr" | "en";
+const MULTILINGUAL_CORE_RULES = [
+  "LANGUAGE ADAPTATION (mandatory):",
+  "You automatically adapt to the customer language.",
+  "You reply naturally in French, English or Spanish depending on the conversation.",
+  "Never say you only speak French.",
+  "Never mention AI limitations.",
+  "Speak like a real commercial advisor — warm, credible, modern African startup tone — never a translation robot.",
+].join("\n");
+
+function recentChatForLang(ctx: PremiumSellerContext): Array<{ role: Role; content: string }> {
+  const h = ctx.history ?? [];
+  return [...h, { role: "user" as const, content: ctx.message }];
+}
 
 export type PremiumSellerProfile = {
   agentName: string;
@@ -47,54 +77,15 @@ export type PremiumSellerContext = {
   personaKey?: string | null;
   productsText?: string; // already formatted list
   chunksText?: string; // already formatted excerpts
-  /** Bloc injecté par `runSalesOpportunityEngine` (vente active) */
+  /** Bloc injecté par `runSalesOpportunityEngine` (vente active) — peut être absent si tour non commercial */
   salesOpportunityBlock?: string;
+  /** Intention tour prospect (orchestrateur — une seule réponse cohérente) */
+  prospectTurnIntent?: ProspectTurnIntent;
 };
-
-function norm(s: string) {
-  return String(s ?? "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function detectDominantLanguage(args: { message: string; previous?: SellerLanguage }): SellerLanguage {
-  const msg = norm(args.message).toLowerCase();
-  if (!msg) return args.previous ?? "fr";
-
-  // Strong cues
-  if (/\b(hello|hi|hey|good morning|good evening|good afternoon|how much|how much is|price|available|in stock|delivery|pay|payment)\b/i.test(msg)) {
-    return "en";
-  }
-  if (/\b(bonjour|bonsoir|bonne\s+après|bonne\s+apres|bon\s+matin|svp|s'il vous plaît|s il vous plait|combien|prix|disponible|en stock|livraison|payer|paiement)\b/i.test(msg)) {
-    return "fr";
-  }
-
-  const enWords = msg.match(
-    /\b(the|a|an|and|or|but|with|for|to|from|of|in|on|at|is|are|we|you|your|sir|madam|please|thanks|thank)\b/gi,
-  )?.length ?? 0;
-  const frWords = msg.match(
-    /\b(le|la|les|un|une|des|et|ou|mais|avec|pour|de|du|dans|sur|chez|est|sont|nous|vous|votre|monsieur|madame|s'il|merci)\b/gi,
-  )?.length ?? 0;
-
-  // Mixed: choose dominant, otherwise keep previous.
-  if (enWords === frWords) return args.previous ?? "fr";
-  return enWords > frWords ? "en" : "fr";
-}
 
 function isBareAck(msg: string) {
   const m = norm(msg).toLowerCase();
   return /^(ok|okay|k|d['’]accord|dac|bien|parfait|merci|mercii|cool|hmm+|mm+|thanks|thank you|thx|👍|👌|🙏)$/i.test(m);
-}
-
-function isGreeting(msg: string) {
-  const m = norm(msg)
-    .toLowerCase()
-    .replace(/[.!?…]+$/g, "")
-    .trim();
-  return (
-    /^(bonjour|bonsoir|bjr|bsr|salut|cc|coucou|hello|hi|hey|good morning|good evening|good afternoon)\b/i.test(m) ||
-    /^(bonne\s+après[\s-]?midi|bonne\s+apres[\s-]?midi|bon\s+matin)\b/i.test(m)
-  );
 }
 
 function isWhoAreYou(msg: string) {
@@ -128,7 +119,8 @@ function detectProspectTone(message: string, history: Array<{ role: Role; conten
     .join(" ");
   const text = `${recentUser} ${message}`.toLowerCase();
 
-  const angry = /(nul|arnaque|scam|mensonge|marre|😠|😡|🤬|je suis pas content|pas content|c'est quoi ça|c est quoi ca)/i.test(text);
+  const angry =
+    /(nul|arnaque|scam|mensonge|marre|😠|😡|🤬|je suis pas content|pas content|c'est quoi ça|c est quoi ca|erreurs|trompez|trompé|trompe|incohérent)/i.test(text);
   const joking = /(mdr|lol|haha|😂|🤣|😄|😆|😅|😉)/i.test(text);
   const rushed =
     /(\b(prix|combien|dispo|stock|where|when|price|available)\b|\burgent\b|\bvite\b|\bnow\b|\basap\b)/i.test(text) || norm(message).length <= 8;
@@ -140,22 +132,22 @@ function detectProspectTone(message: string, history: Array<{ role: Role; conten
 
 function detectOffTopic(message: string) {
   const m = norm(message).toLowerCase();
-  if (/(vous mangez|tu manges|on mange|quoi ce soir|ce soir tu manges|you eating|what are you eating|dinner|what’s for dinner)/i.test(m))
+  if (/(vous mangez|tu manges|on mange|quoi ce soir|ce soir tu manges|you eating|what are you eating|dinner|what’s for dinner|qué\s+cenas|qué\s+vas\s+a\s+comer)/i.test(m))
     return "food";
-  if (/(ça va|ca va|how are you|you good|you ok)/i.test(m)) return "smalltalk";
+  if (/(ça va|ca va|how are you|you good|you ok|cómo\s+está|cómo\s+estás|qué\s+tal|que\s+tal)/i.test(m)) return "smalltalk";
   return null;
 }
 
 function microReactionPack(lang: SellerLanguage) {
-  return lang === "en"
-    ? ["Right.", "Okay.", "I see.", "Alright.", "Sure.", "Just a sec, I’m checking."]
-    : ["Ah oui.", "Je vois.", "D’accord.", "Effectivement.", "Oui possible.", "Attendez je regarde."];
+  if (lang === "en") return ["Right.", "Okay.", "I see.", "Alright.", "Sure.", "Just a sec, I’m checking."];
+  if (lang === "es") return ["Vale.", "De acuerdo.", "Le entiendo.", "Claro.", "Un momento, estoy mirando eso."];
+  return ["Ah oui.", "Je vois.", "D’accord.", "Effectivement.", "Oui possible.", "Attendez je regarde."];
 }
 
 function connectorsPack(lang: SellerLanguage) {
-  return lang === "en"
-    ? ["So,", "In that case,", "But", "Honestly,", "Alright then,"]
-    : ["Alors,", "Dans ce cas,", "Par contre,", "Honnêtement,", "Du coup,"];
+  if (lang === "en") return ["So,", "In that case,", "But", "Honestly,", "Alright then,"];
+  if (lang === "es") return ["Entonces,", "En ese caso,", "Pero", "Sinceramente,", "Bueno,"];
+  return ["Alors,", "Dans ce cas,", "Par contre,", "Honnêtement,", "Du coup,"];
 }
 
 function pickOne<T>(items: T[], seed: string) {
@@ -184,106 +176,69 @@ function truncateMemoryLines(rawLines: string[], maxChars: number): string[] {
 
 /** Réponse d’attente naturelle après échec IA (ne pas utiliser de formulations type « petite lenteur »). */
 export function pickHoldReply(lang: SellerLanguage, seed: string): string {
-  const fr = ["Je regarde cela.", "Un instant s'il vous plaît.", "Je vérifie."];
-  const en = ["Just a moment.", "Let me check that.", "One moment please."];
-  return pickOne(lang === "en" ? en : fr, seed);
+  const fr = ["Je regarde cela Monsieur.", "Un instant s'il vous plaît.", "Je vérifie."];
+  const en = ["One moment sir, I’m checking that for you.", "Just a moment.", "Let me check that."];
+  const es = ["Un momento señor, estoy verificando eso.", "Un instante, por favor.", "Le confirmo en seguida."];
+  return pickOne(lang === "en" ? en : lang === "es" ? es : fr, seed);
 }
 
 export function quickHumanReply(profile: PremiumSellerProfile, ctx: PremiumSellerContext): string | null {
   const message = norm(ctx.message);
   const history = Array.isArray(ctx.history) ? ctx.history : [];
-  const hasAssistantBefore = history.some((m) => m.role === "assistant");
-  const lang = detectDominantLanguage({ message, previous: ctx.conversationState?.language });
+  const lang = detectDominantLanguage({
+    message,
+    previous: ctx.conversationState?.language,
+    history: recentChatForLang(ctx),
+  });
 
-  if (isGreeting(message)) {
-    const nowLocal = businessNow(profile);
-    const salFr = frenchSalutationForLocalTime(nowLocal);
-    const salEn = englishSalutationForLocalTime(nowLocal);
-    const explicitFr = lang === "fr" ? detectProspectExplicitFrenchGreeting(message) : null;
-    const resolvedFr = explicitFr ? resolveFrenchOpeningPhrase({ nowLocal, explicitKind: explicitFr }) : null;
-    const dayPartFr = resolvedFr?.phraseFr ?? salFr.phraseFr;
-    const pp = ctx.conversationState?.prospectProfile;
-    const honorFr = frenchHonorificSmart(pp);
-    const dayPartEn = salEn.phraseEn;
-
-    const honorEn = englishHonorificSmart(pp);
-
-    // Only do full intro if it’s the start (no assistant messages yet).
-    if (!hasAssistantBefore) {
-      const sector = String(profile.sector ?? "").toLowerCase();
-      let orientFr = "Nous avons actuellement plusieurs modèles disponibles selon votre budget.";
-      let orientEn = "We currently have several models available depending on your budget.";
-      if (/chauss|sport|textil|mode|vetement|vêtement/i.test(sector)) {
-        orientFr = "Vous cherchez plutôt chaussures, accessoires ou autre chose dans ce rayon ?";
-        orientEn = "Are you mainly looking for shoes, accessories, or something else in that range?";
-      } else if (/élect|electron|info|tel|tech|informat|phone|mobile/i.test(sector)) {
-        orientFr = "Vous cherchez plutôt téléphones, accessoires ou matériel électronique ?";
-        orientEn = "Are you looking for phones, accessories, or other electronics?";
-      }
-
-      const frLine =
-        honorFr != null
-          ? ([
-              `${dayPartFr} ${honorFr}.\nJe vous écoute.`,
-              `${dayPartFr} ${honorFr}.\n${orientFr}`,
-              `${dayPartFr} ${honorFr}.\n${profile.businessName} — ${orientFr}`,
-            ] as const)
-          : ([
-              `${dayPartFr}.\nJe vous écoute — ${orientFr}`,
-              `${dayPartFr}.\n${profile.businessName} — ${orientFr}`,
-              `${dayPartFr}.\n${orientFr}`,
-              `Bonjour et bienvenue chez ${profile.businessName}.\n${orientFr}`,
-            ] as const);
-
-      const enLine =
-        honorEn != null
-          ? ([
-              `${dayPartEn} ${honorEn}.\nI'm listening — ${orientEn}`,
-              `${dayPartEn} ${honorEn}.\n${orientEn}`,
-              `${dayPartEn} ${honorEn}.\n${profile.businessName} — ${orientEn}`,
-            ] as const)
-          : ([
-              `${dayPartEn}.\nI'm listening — ${orientEn}`,
-              `${dayPartEn}.\n${profile.businessName} — ${orientEn}`,
-              `${dayPartEn}.\n${orientEn}`,
-              `Hello and welcome to ${profile.businessName}.\n${orientEn}`,
-            ] as const);
-
-      const variants = lang === "en" ? [...enLine] : [...frLine];
-      return pickOne(variants, message + profile.agentName + profile.businessName);
-    }
-
-    const short =
-      lang === "en"
-        ? honorEn != null
-          ? [`${dayPartEn} ${honorEn}.`, `${dayPartEn}.`, "Noted."]
-          : [`${dayPartEn}.`, "Noted.", "Got it."]
-        : honorFr != null
-          ? [`${dayPartFr} ${honorFr}.`, `${dayPartFr}.`, "Bien reçu."]
-          : [`${dayPartFr}.`, "Bien reçu.", "C’est noté."];
-    return pickOne(short, message + profile.agentName);
+  if (isPersonalWellbeingTurn(message)) {
+    return buildPersonalWellbeingQuickReply({
+      message: ctx.message,
+      lang,
+      agentName: profile.agentName,
+      businessName: profile.businessName,
+      prospectProfile: ctx.conversationState?.prospectProfile,
+    });
   }
+
+  const greetingHit = tryHumanizedGreetingQuickReply(
+    {
+      agentName: profile.agentName,
+      businessName: profile.businessName,
+      sector: profile.sector,
+      businessIanaTimezone: profile.businessIanaTimezone,
+    },
+    { message: ctx.message, history, conversationState: ctx.conversationState },
+  );
+  if (greetingHit) return greetingHit;
 
   if (isBareAck(message)) {
     const pp = ctx.conversationState?.prospectProfile;
     const hFr = frenchHonorificSmart(pp);
+    const hEs = spanishHonorificSmart(pp);
     const variants =
       lang === "en"
-        ? ["Alright.", "Perfect.", "Noted.", "Okay."]
-        : hFr
-          ? [`D’accord ${hFr}.`, "Très bien.", "Parfait.", "Bien reçu."]
-          : ["D’accord.", "Très bien.", "Parfait.", "Bien reçu."];
+        ? ["Alright.", "Perfect.", "Okay.", "Very well."]
+        : lang === "es"
+          ? hEs
+            ? [`De acuerdo ${hEs}.`, "Muy bien.", "Perfecto.", "Queda anotado."]
+            : ["De acuerdo.", "Muy bien.", "Perfecto.", "Queda anotado."]
+          : hFr
+            ? [`D’accord ${hFr}.`, "Très bien.", "Parfait.", "C’est bien noté."]
+            : ["D’accord.", "Très bien.", "Parfait.", "C’est bien noté."];
     return pickOne(variants, message + (profile.agentName ?? ""));
   }
 
   if (isWhoAreYou(message)) {
-    return lang === "en"
-      ? `I’m ${profile.agentName} from ${profile.businessName}.`
-      : `Je suis ${profile.agentName} du service client ${profile.businessName}.`;
+    if (lang === "en") return `I’m ${profile.agentName} from ${profile.businessName}.`;
+    if (lang === "es") return `Soy ${profile.agentName} del servicio al cliente de ${profile.businessName}.`;
+    return `Je suis ${profile.agentName} du service client ${profile.businessName}.`;
   }
 
   if (isWhoDoYouWorkFor(message)) {
-    return lang === "en" ? `I work with the ${profile.businessName} team.` : `Je travaille avec l’équipe ${profile.businessName}.`;
+    if (lang === "en") return `I work with the ${profile.businessName} team.`;
+    if (lang === "es") return `Trabajo con el equipo de ${profile.businessName}.`;
+    return `Je travaille avec l’équipe ${profile.businessName}.`;
   }
 
   if (isTimeQuestion(message)) {
@@ -295,6 +250,11 @@ export function quickHumanReply(profile: PremiumSellerProfile, ctx: PremiumSelle
       if (hour >= 18) return `It’s ${wall} here — evening already.`;
       return `It’s ${wall} here — still daytime.`;
     }
+    if (lang === "es") {
+      if (hour >= 22 || hour < 5) return `Aquí son las ${wall} — ya es tarde.`;
+      if (hour >= 18) return `Aquí son las ${wall} — ya es por la noche.`;
+      return `Aquí son las ${wall} — aún es de día.`;
+    }
     if (hour >= 22 || hour < 5) return `Ici il est ${wall} — un peu tard.`;
     if (hour >= 18) return `Ici il est ${wall} — on est le soir.`;
     return `Ici il est ${wall} — journée encore.`;
@@ -305,7 +265,9 @@ export function quickHumanReply(profile: PremiumSellerProfile, ctx: PremiumSelle
     const variants =
       lang === "en"
         ? ["Haven’t thought about it yet.", "Good question.", "Not sure yet."]
-        : ["Je n’ai pas encore réfléchi.", "Bonne question.", "Je ne sais pas encore."];
+        : lang === "es"
+          ? ["Aún no lo he pensado.", "Buena pregunta.", "Todavía no lo sé."]
+          : ["Je n’ai pas encore réfléchi.", "Bonne question.", "Je ne sais pas encore."];
     return pickOne(variants, message + profile.agentName);
   }
 
@@ -319,7 +281,16 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
     Array.isArray(ctx.conversationState?.memory) ? ctx.conversationState!.memory!.map(String) : [],
     BUSINESS_MEMORY_MAX_CHARS,
   );
-  const lang = detectDominantLanguage({ message: ctx.message, previous: ctx.conversationState?.language });
+  const lang = detectDominantLanguage({
+    message: ctx.message,
+    previous: ctx.conversationState?.language,
+    history: recentChatForLang(ctx),
+  });
+  const turnIntent = ctx.prospectTurnIntent ?? detectProspectTurnIntent(ctx.message);
+  const orchestratorBlock = formatTurnIntentOrchestratorBlock(turnIntent, lang);
+  const langHint: SellerPromptLangHint = lang === "es" ? "es" : lang === "en" ? "en" : "fr";
+  const emotionalTemperature = inferConversationEmotionalTemperature(ctx.message);
+  const emotionalTemperatureBlock = formatEmotionalTemperaturePromptBlock(emotionalTemperature, langHint);
   const fatigue = Math.max(0, Math.min(1, ctx.conversationState?.stats?.fatigue ?? 0));
   const nowLocal = businessNow(profile);
   const hour = nowLocal.hour;
@@ -334,13 +305,21 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
           : daySlot === "evening"
             ? "evening"
             : "late night"
-      : daySlot === "morning"
-        ? "matin"
-        : daySlot === "afternoon"
-          ? "après-midi"
-          : daySlot === "evening"
-            ? "soir"
-            : "nuit";
+      : lang === "es"
+        ? daySlot === "morning"
+          ? "mañana"
+          : daySlot === "afternoon"
+            ? "tarde"
+            : daySlot === "evening"
+              ? "noche"
+              : "madrugada"
+        : daySlot === "morning"
+          ? "matin"
+          : daySlot === "afternoon"
+            ? "après-midi"
+            : daySlot === "evening"
+              ? "soir"
+              : "nuit";
   const prospectTone = detectProspectTone(ctx.message, ctx.history ?? []);
   const intent = ctx.conversationState?.lastSellerIntent;
   const prospectProfile = ctx.conversationState?.conversationProfile;
@@ -354,10 +333,23 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
   const localClockLine = localFmt
     ? lang === "en"
       ? `LOCAL BUSINESS TIME (${profile.city ?? "—"}, ${profile.country ?? "—"} — ${iana}): ${localFmt.wallClock}.`
-      : `HEURE LOCALE BOUTIQUE (${profile.city ?? "—"}, ${profile.country ?? "—"} — fuseau ${iana}) : ${localFmt.wallClock}.`
+      : lang === "es"
+        ? `HORA LOCAL TIENDA (${profile.city ?? "—"}, ${profile.country ?? "—"} — ${iana}): ${localFmt.wallClock}.`
+        : `HEURE LOCALE BOUTIQUE (${profile.city ?? "—"}, ${profile.country ?? "—"} — fuseau ${iana}) : ${localFmt.wallClock}.`
     : null;
 
   const prospectIdentityBlock = formatProspectProfilePromptBlock(prospectIdentity, lang);
+
+  const stateEngineBlock = formatConversationStateEnginePromptBlock(
+    buildConversationStateEngineSnapshot({
+      message: ctx.message,
+      history: ctx.history ?? [],
+      conversationState: ctx.conversationState,
+      businessIanaTimezone: profile.businessIanaTimezone,
+      businessName: profile.businessName,
+      agentName: profile.agentName,
+    }),
+  );
 
   const explicitFrThisTurn = lang === "fr" ? detectProspectExplicitFrenchGreeting(ctx.message) : null;
   const resolvedOpeningFr =
@@ -381,6 +373,15 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
     "- If they use a specific phrase like “good afternoon”, keep it consistent — don’t snap to “good evening” unless the overall tone benefits from a gentle blend.",
     "- If their generic greeting mismatches local time, prefer the correct greeting without lecturing them.",
     "- Late night pickup requests: politely set expectations and offer next-day morning — human, not scripted.",
+  ].join("\n");
+
+  const temporalAwarenessEs = [
+    "TIEMPO Y SALUDOS (obligatorio):",
+    "- La zona horaria / ciudad / país de la tienda arriba es la referencia.",
+    "- Franjas locales: mañana 05:00–11:59 ; tarde 12:00–17:59 ; noche 18:00–23:59 ; madrugada 00:00–04:59.",
+    "- Si el prospecto usa una fórmula concreta («buenas tardes»), mantenga coherencia — no cambie bruscamente a «buenas noches» sin necesidad.",
+    "- Si el saludo genérico no encaja con la hora local, use el saludo correcto sin corregir al prospecto.",
+    "- Pedidos muy tarde: marque expectativas con calidez y ofrezca continuar por la mañana — humano, no guion.",
   ].join("\n");
 
   const greetingHintFr =
@@ -436,22 +437,32 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
           ]
             .filter(Boolean)
             .join("\n")
-        : [
-            profile.agentRole
-              ? `Vous êtes ${profile.agentName}, ${profile.agentRole} chez ${profile.businessName}.`
-              : null,
-            profile.agentTone ? `Ton à incarner: ${profile.agentTone}.` : null,
-            "Ne dites jamais que vous êtes une IA, un bot ou un assistant.",
-          ]
-            .filter(Boolean)
-            .join("\n")
+        : lang === "es"
+          ? [
+              profile.agentRole ? `Usted es ${profile.agentName}, ${profile.agentRole} en ${profile.businessName}.` : null,
+              profile.agentTone ? `Tono personal a encarnar: ${profile.agentTone}.` : null,
+              "Nunca diga que es una IA, un bot o un asistente.",
+            ]
+              .filter(Boolean)
+              .join("\n")
+          : [
+              profile.agentRole
+                ? `Vous êtes ${profile.agentName}, ${profile.agentRole} chez ${profile.businessName}.`
+                : null,
+              profile.agentTone ? `Ton à incarner: ${profile.agentTone}.` : null,
+              "Ne dites jamais que vous êtes une IA, un bot ou un assistant.",
+            ]
+              .filter(Boolean)
+              .join("\n")
       : null;
 
   const followupHold =
     ctx.followupAfterHold === true
       ? lang === "en"
         ? "CRITICAL FOLLOW-UP: You already told the prospect you were checking. They are still waiting. Now give a CONCRETE answer: product name, price in FCFA if in catalogue, stock if known. 1–2 short sentences. Do NOT say again that you are checking or ask what they need."
-        : "SUIVI CRITIQUE: Vous avez déjà dit que vous vérifiez. Le prospect attend. Donnez maintenant une réponse CONCRÈTE: nom produit, prix en FCFA si dans le catalogue, dispo/stock si pertinent. 1–2 phrases courtes. Ne redites pas « je vérifie » et ne posez pas « que recherchez-vous ». Ensuite, une micro-prochaine étape naturelle (ex. envoi des infos livraison, réservation soft) si pertinent — sans insistance."
+        : lang === "es"
+          ? "SEGUIMIENTO CRÍTICO: Ya dijo que estaba verificando. El prospecto sigue esperando. Dé ahora una respuesta CONCRETA: nombre del producto, precio en FCFA si está en catálogo, stock si aplica. 1–2 frases cortas. NO repita «estoy verificando» ni pregunte qué necesita sin aportar datos."
+          : "SUIVI CRITIQUE: Vous avez déjà dit que vous vérifiez. Le prospect attend. Donnez maintenant une réponse CONCRÈTE: nom produit, prix en FCFA si dans le catalogue, dispo/stock si pertinent. 1–2 phrases courtes. Ne redites pas « je vérifie » et ne posez pas « que recherchez-vous ». Ensuite, une micro-prochaine étape naturelle (ex. envoi des infos livraison, réservation soft) si pertinent — sans insistance."
       : null;
 
   const intentBlockEn =
@@ -466,6 +477,23 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
             ? `- products mentioned before: ${productMemory.viewedProducts.join(", ")}`
             : null,
           productMemory?.budgetHint ? `- budget hint: ${productMemory.budgetHint}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : null;
+
+  const intentBlockEs =
+    intent != null
+      ? [
+          "INTENCIÓN DETECTADA (adaptar tono + objetivo; humano y breve):",
+          `- intención: ${intent}`,
+          prospectProfile
+            ? `- perfil: tono=${prospectProfile.tone}, interés=${prospectProfile.interestLevel}, intención de compra≈${prospectProfile.buyingIntent}, estilo=${prospectProfile.preferredLanguageStyle}`
+            : null,
+          productMemory?.viewedProducts?.length
+            ? `- productos ya mencionados: ${productMemory.viewedProducts.join(", ")}`
+            : null,
+          productMemory?.budgetHint ? `- pista de presupuesto: ${productMemory.budgetHint}` : null,
         ]
           .filter(Boolean)
           .join("\n")
@@ -494,7 +522,9 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
     "- Pas de listes numérotées type FAQ, pas de sur-explication, pas de phrases « parfaites » longues.",
     "- Jamais « en tant qu’assistant », jamais mention d’IA.",
     "- Varier les tournures; éviter les formules marketing creuses.",
+    "- Si le prospect est agacé ou vous reproche des erreurs : reconnaissance courte et sincère (« vous avez raison », « merci pour votre retour ») puis réponse au fond — interdit d’enchaîner seul sur « comment puis-je vous aider ».",
     "- Pour avancer sans robot : « Je vous écoute », « Quel modèle vous intéresse ? », « Une fourchette de budget ? » — alternez ; interdit de boucler sur les mêmes phrases d’aide générique.",
+    "- Niveau 2 émotion : pas de ton psychologue (« je comprends ce que vous ressentez »), pas de support bancaire (« je comprends votre déception », « je suis là pour résoudre cela », « votre satisfaction est notre priorité »). Si le prospect est frustré : phrases très courtes, calmes — comme WhatsApp avec un vrai conseiller.",
   ].join("\n");
 
   const antiChatGptEn = [
@@ -503,6 +533,16 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
     "- No numbered FAQ lists, no over-explaining, no overly polished corporate paragraphs.",
     "- Never mention AI or being an assistant.",
     "- Vary phrasing; avoid hollow marketing language.",
+    "- Level 2 emotion: no therapist lines (“I understand what you’re feeling”), no bank-support clichés (“I understand your disappointment”, “I’m here to resolve this”, “your satisfaction is our priority”). If they’re upset: very short, calm — like WhatsApp with a real salesperson.",
+  ].join("\n");
+
+  const antiChatGptEs = [
+    "ANTI-CHATGPT (estricto):",
+    "- Sin tono de «coach» ni consultor digital; cercano pero profesional.",
+    "- Sin listas numeradas tipo FAQ, sin párrafos largos perfectos.",
+    "- Nunca mencionar IA ni que es un asistente.",
+    "- Varíe las frases; evite slogans vacíos.",
+    "- Nivel 2 emoción: sin tono psicólogo ni frases de soporte bancario automatizado. Si está molesto: muy breve y calmado — como WhatsApp con un vendedor real.",
   ].join("\n");
 
   const regionBlockFr =
@@ -519,56 +559,94 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
       ? "LOCAL STYLE (Francophone West Africa, subtle): Sir/Madam/Chief only when natural—professional, not slangy."
       : null;
 
+  const regionBlockEs =
+    regionStyle === "west_africa"
+      ? "ESTILO LOCAL (África occidental, sutil): Señor/Señora/Jefe solo si suena natural — profesional, sin argot forzado."
+      : null;
+
   const agentBlock =
     lang === "en"
       ? ctx.personaKey
         ? `Agent persona (${ctx.personaKey}): real human salesperson — calm, concise, credible, no assistant tone.`
         : null
-      : agentExtra || null;
+      : lang === "es"
+        ? ctx.personaKey
+          ? `Persona agente (${ctx.personaKey}): vendedor humano real — calmado, breve, creíble, sin tono de asistente.`
+          : null
+        : agentExtra || null;
+
+  const langRuleLine =
+    lang === "en"
+      ? "LANGUAGE RULE (CRITICAL): Reply ONLY in English. Do NOT mix French, Spanish and English."
+      : lang === "es"
+        ? "REGLA DE IDIOMA (CRÍTICA): responda SOLO en español. No mezcle español con francés ni inglés."
+        : "RÈGLE LANGUE (CRITIQUE): Répondez UNIQUEMENT en français. Ne mélangez jamais français/anglais/espagnol.";
+
+  const temporalForCommon = lang === "en" ? temporalAwarenessEn : lang === "es" ? temporalAwarenessEs : temporalAwarenessFr;
+  const antiForCommon = lang === "en" ? antiChatGptEn : lang === "es" ? antiChatGptEs : antiChatGptFr;
+  const intentForCommon = lang === "en" ? intentBlockEn : lang === "es" ? intentBlockEs : intentBlockFr;
+  const regionForCommon = lang === "en" ? regionBlockEn : lang === "es" ? regionBlockEs : regionBlockFr;
+
+  const lastAssistantLine = lastAssistant
+    ? lang === "en"
+      ? `ANTI-REPETITION: your last message was: "${norm(String(lastAssistant)).slice(0, 180)}"`
+      : lang === "es"
+        ? `ANTI-REPETICIÓN: su último mensaje fue: "${norm(String(lastAssistant)).slice(0, 180)}"`
+        : `ANTI-RÉPÉTITION: votre dernier message était: "${norm(String(lastAssistant)).slice(0, 180)}"`
+    : null;
+
+  const bansHeader =
+    lang === "en"
+      ? "ABSOLUTE BANS (never output, even reworded):"
+      : lang === "es"
+        ? "PROHIBICIONES ABSOLUTAS (nunca producir, ni reformulado):"
+        : "INTERDITS ABSOLUS (ne jamais produire, même reformulé):";
+
+  const memoryBlock = memory.length
+    ? lang === "en"
+      ? "PROSPECT MEMORY (use it, don’t ask again):\n" + memory.map((x) => `- ${String(x).trim()}`).join("\n")
+      : lang === "es"
+        ? "MEMORIA DEL PROSPECTO (úsela, no vuelva a preguntar):\n" + memory.map((x) => `- ${String(x).trim()}`).join("\n")
+        : "MÉMOIRE PROSPECT (à utiliser, sans redemander):\n" + memory.map((x) => `- ${String(x).trim()}`).join("\n")
+    : null;
 
   const common = [
-    lang === "en"
-      ? "LANGUAGE RULE (CRITICAL): Reply ONLY in English. Do NOT mix French and English."
-      : "RÈGLE LANGUE (CRITIQUE): Répondez UNIQUEMENT en français. Ne mélangez jamais français/anglais.",
+    langRuleLine,
     "",
     localClockLine,
     "",
+    stateEngineBlock,
+    "",
+    orchestratorBlock,
+    "",
+    emotionalTemperatureBlock ?? null,
+    "",
     greetingHintFr,
     "",
-    lang === "en" ? temporalAwarenessEn : temporalAwarenessFr,
+    temporalForCommon,
     "",
     etiquettePromptFr,
     "",
     prospectIdentityBlock ?? null,
     "",
-    lang === "en" ? antiChatGptEn : antiChatGptFr,
+    antiForCommon,
     "",
     ctx.salesOpportunityBlock ?? null,
-    lang === "en" ? intentBlockEn : intentBlockFr,
+    intentForCommon,
     "",
-    lang === "en" ? regionBlockEn : regionBlockFr,
+    regionForCommon,
     "",
     agentBlock,
     "",
     identityExtra,
     "",
     followupHold,
-    lastAssistant
-      ? lang === "en"
-        ? `ANTI-REPETITION: your last message was: "${norm(String(lastAssistant)).slice(0, 180)}"`
-        : `ANTI-RÉPÉTITION: votre dernier message était: "${norm(String(lastAssistant)).slice(0, 180)}"`
-      : null,
+    lastAssistantLine,
     "",
-    lang === "en"
-      ? "ABSOLUTE BANS (never output, even reworded):"
-      : "INTERDITS ABSOLUS (ne jamais produire, même reformulé):",
+    bansHeader,
     ...hardBans.map((x) => `- ${x}`),
     "",
-    memory.length
-      ? lang === "en"
-        ? "PROSPECT MEMORY (use it, don’t ask again):\n" + memory.map((x) => `- ${String(x).trim()}`).join("\n")
-        : "MÉMOIRE PROSPECT (à utiliser, sans redemander):\n" + memory.map((x) => `- ${String(x).trim()}`).join("\n")
-      : null,
+    memoryBlock,
   ]
     .filter(Boolean)
     .join("\n");
@@ -578,6 +656,8 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
       "You are a REAL human sales advisor at a desk (messaging app — not an AI assistant).",
       "Goal: premium, credible, natural sales conversation. The prospect must believe it’s a real employee.",
       "Never: generic assistant phrases, long paragraphs, robotic politeness.",
+      "",
+      MULTILINGUAL_CORE_RULES,
       "",
       `Identity: your name is ${profile.agentName}.`,
       `Business: ${profile.businessName}${profile.city ? ` (${profile.city})` : ""}${profile.country ? `, ${profile.country}` : ""}.`,
@@ -636,10 +716,77 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
       .join("\n");
   }
 
+  if (lang === "es") {
+    return [
+      "Usted es un asesor comercial HUMANO real (mensajería — no un asistente IA).",
+      "Objetivo: conversación premium, creíble y natural. El prospecto debe creer que habla con un empleado de verdad.",
+      "Nunca: frases de asistente genérico, párrafos largos, cortesía robótica.",
+      "",
+      MULTILINGUAL_CORE_RULES,
+      "",
+      `Identidad: su nombre es ${profile.agentName}.`,
+      `Negocio: ${profile.businessName}${profile.city ? ` (${profile.city})` : ""}${profile.country ? `, ${profile.country}` : ""}.`,
+      profile.sector ? `Sector: ${profile.sector}.` : null,
+      "",
+      "ESTILO (estricto):",
+      "- Mensajes cortos: 1–2 frases pequeñas.",
+      "- 0 o 1 emoji como máximo, raro.",
+      "- 0 o 1 pregunta como máximo. A menudo 0.",
+      "- Sin tono FAQ ni «aquí están los puntos».",
+      "- Profesional, calmado, moderno.",
+      "",
+      "COMPORTAMIENTO HUMANO:",
+      "- A veces muy breve (vale/gracias/de acuerdo).",
+      "- Varíe las frases (evite repetición).",
+      "- Si está molesto o confundido: respuesta corta + acción concreta.",
+      "",
+      "CALIFICACIÓN SUAVE (sin interrogatorio):",
+      "- Entender necesidad / preferencia / presupuesto / urgencia / duda con el tiempo.",
+      "- Micro elecciones A/B naturales cuando ayuden.",
+      "",
+      "VENTA ACTIVA (premium, no agresiva):",
+      "- Proponga alternativas solo si están en el catálogo.",
+      "- Espíritu: «También tenemos una versión más reciente» / «Muy elegido por la batería» — nunca agresivo.",
+      "",
+      "CONTEXTO DE NEGOCIO (obligatorio):",
+      "- Use catálogo / precios / stock / promos solo si se proporcionan.",
+      "- Nunca invente productos ni promos.",
+      "",
+      "ENERGÍA HUMANA (variable):",
+      `- Momento del día: ${bucketLabel}.`,
+      `- Tono del prospecto: ${prospectTone}.`,
+      `- Fatiga (0..1): ${fatigue.toFixed(2)}.`,
+      "- Si va con prisa: más corto y directo.",
+      "- Si está enfadado: calma, sin defensiva, acción primero.",
+      "- Si bromea: respuesta ligera (0–1 emoji) y vuelta natural al negocio.",
+      "- Si la fatiga es alta: más corto, menos vendedor, más natural (siempre profesional).",
+      "",
+      "MICRO REACCIONES (raras, 0 o 1 a veces):",
+      "- Ejemplos: " + microReactionPack("es").join(" / "),
+      "",
+      "TRANSICIONES HUMANAS (a veces, no siempre):",
+      "- Ejemplos: " + connectorsPack("es").join(" "),
+      "",
+      "EMPLEADO OCUPADO (a veces):",
+      "- «Un momento, estoy mirando eso.» / «Segundito.» / «Sí, confirmo.»",
+      "",
+      "RESPUESTAS OPERATIVAS CORTAS:",
+      "- Si preguntan horario: responda como humano. Ej.: «Normalmente hasta las 18h.»",
+      "",
+      `Tono objetivo: ${personalityHint} ${salesStyleHint} (tone_mode: ${toneMode}).`,
+      "",
+      common,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   return [
     "Vous êtes un employé HUMAIN au bureau (messagerie — pas un assistant IA).",
     "Objectif: conversation commerciale premium, crédible, naturelle. Le prospect doit croire à un vrai conseiller.",
     "Jamais: phrases génériques, paragraphes, ton robot, politesse artificielle.",
+    "",
+    MULTILINGUAL_CORE_RULES,
     "",
     `Identité: vous vous appelez ${profile.agentName}.`,
     `Entreprise: ${profile.businessName}${profile.city ? ` (${profile.city})` : ""}${profile.country ? `, pays: ${profile.country}` : ""}.`,
@@ -712,24 +859,43 @@ export function buildPremiumSystemPrompt(profile: PremiumSellerProfile, ctx: Pre
 export function buildPremiumUserPrompt(profile: PremiumSellerProfile, ctx: PremiumSellerContext) {
   const products = norm(ctx.productsText ?? "");
   const chunks = norm(ctx.chunksText ?? "");
-  const lang = detectDominantLanguage({ message: ctx.message, previous: ctx.conversationState?.language });
+  const lang = detectDominantLanguage({
+    message: ctx.message,
+    previous: ctx.conversationState?.language,
+    history: recentChatForLang(ctx),
+  });
+  const turnIntent = ctx.prospectTurnIntent ?? detectProspectTurnIntent(ctx.message);
+
+  const catLabel = lang === "en" ? "CATALOGUE (if relevant):" : lang === "es" ? "CATÁLOGO (si aplica):" : "CATALOGUE (si pertinent):";
+  const emptyCat = lang === "en" ? "(empty)" : lang === "es" ? "(vacío)" : "(vide)";
+  const docLabel =
+    lang === "en" ? "DOCUMENT EXCERPTS (if relevant):" : lang === "es" ? "EXTRACTOS DE DOCUMENTOS (si aplica):" : "EXTRAITS DOCUMENTS (si pertinent):";
+  const histLabel = lang === "en" ? "Recent history:" : lang === "es" ? "Historial reciente:" : "Historique récent:";
+  const msgLabel = lang === "en" ? "Prospect message:" : lang === "es" ? "Mensaje del prospecto:" : "Message prospect:";
+  const intentLabel = lang === "en" ? "Orchestrator turn intent:" : lang === "es" ? "Intención del turno (orquestador):" : "Intention tour (orchestrateur) :";
+  const finalLabel = lang === "en" ? "Final instruction:" : lang === "es" ? "Instrucción final:" : "Instruction finale:";
+  const finalLine =
+    lang === "en" ? "Reply now—follow all rules above." : lang === "es" ? "Responda ahora—respete todas las reglas anteriores." : "Répondez maintenant—respectez les règles ci-dessus.";
 
   return [
-    lang === "en" ? "CATALOGUE (if relevant):" : "CATALOGUE (si pertinent):",
-    products ? products : lang === "en" ? "(empty)" : "(vide)",
+    catLabel,
+    products ? products : emptyCat,
     "",
-    lang === "en" ? "DOCUMENT EXCERPTS (if relevant):" : "EXTRAITS DOCUMENTS (si pertinent):",
-    chunks ? chunks : lang === "en" ? "(empty)" : "(vide)",
+    docLabel,
+    chunks ? chunks : emptyCat,
     "",
-    lang === "en" ? "Recent history:" : "Historique récent:",
-    (ctx.history ?? []).slice(-12).map((m) => `${m.role === "user" ? "Prospect" : profile.agentName}: ${norm(m.content).slice(0, 500)}`).join("\n") ||
-      (lang === "en" ? "(empty)" : "(vide)"),
+    histLabel,
+    (ctx.history ?? []).slice(-10).map((m) => `${m.role === "user" ? "Prospect" : profile.agentName}: ${norm(m.content).slice(0, 500)}`).join("\n") ||
+      emptyCat,
     "",
-    lang === "en" ? "Prospect message:" : "Message prospect:",
+    msgLabel,
     norm(ctx.message),
     "",
-    lang === "en" ? "Final instruction:" : "Instruction finale:",
-    lang === "en" ? "Reply now—follow all rules above." : "Répondez maintenant—respectez les règles ci-dessus.",
+    intentLabel,
+    turnIntent,
+    "",
+    finalLabel,
+    finalLine,
   ].join("\n");
 }
 

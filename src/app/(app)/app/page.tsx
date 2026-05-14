@@ -81,6 +81,13 @@ export default function DashboardPage() {
               <p className="text-sm text-[var(--brand-navy)]/65 sm:text-base">
                 Aujourd’hui, on vise plus de réponses rapides — et plus de conversions.
               </p>
+              <p className="text-xs text-[var(--brand-navy)]/55 sm:text-sm">
+                Langues supportées : <span className="whitespace-nowrap">🇫🇷 Français</span>
+                {" · "}
+                <span className="whitespace-nowrap">🇬🇧 English</span>
+                {" · "}
+                <span className="whitespace-nowrap">🇪🇸 Español</span>
+              </p>
             </div>
 
             <div className="flex items-center gap-2">

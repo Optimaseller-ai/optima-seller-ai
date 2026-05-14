@@ -24,6 +24,22 @@ export {
 export { maybeSplitAssistantMessage } from "./conversation/message-splitting";
 export { maybeHumanMicroPrefix } from "./conversation/micro-behaviors";
 export {
+  buildConversationStateEngineSnapshot,
+  formatConversationStateEnginePromptBlock,
+  tryHumanizedGreetingQuickReply,
+  isProspectGreetingMessage,
+} from "./conversation-state-engine";
+export {
+  buildPersonalWellbeingQuickReply,
+  detectProspectTurnIntent,
+  formatTurnIntentOrchestratorBlock,
+  isPersonalWellbeingTurn,
+  orchestrateHumanReply,
+  salesOpportunityAllowedForIntent,
+  type ProspectTurnIntent,
+} from "./response-orchestrator";
+export { filterAdvisorReplyHumanLikeness } from "./human-advisor-reply-filter";
+export {
   buildConversationMemorySnapshot,
   type ConversationMemorySnapshot,
 } from "./memory/conversation-memory";

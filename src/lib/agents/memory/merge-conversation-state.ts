@@ -6,6 +6,7 @@ import {
   detectProspectExplicitFrenchGreeting,
   mergeProspectProfileFromUserMessage,
 } from "@/lib/agents/memory/prospect-profile";
+import { detectConversationLanguage } from "@/lib/ai/language-detection";
 import type {
   ConversationalEtiquette,
   ProductMemory,
@@ -46,6 +47,8 @@ function mergeProductMemory(prev: ProductMemory | undefined, message: string, in
 export function mergeSellerBehaviorStateForUserTurn(args: {
   previous: unknown;
   message: string;
+  /** Derniers tours (incluant le message user courant en fin de liste) pour la détection de langue */
+  recentChat?: Array<{ role: "user" | "assistant"; content: string }>;
 }): { state: SellerBehaviorConversationState; intent: SellerIntent } {
   const prev = asPartialState(args.previous);
   const intent = detectSellerIntent(args.message);
@@ -131,8 +134,15 @@ export function mergeSellerBehaviorStateForUserTurn(args: {
     prospectEverSentGreeting,
   };
 
+  const language = detectConversationLanguage({
+    message: args.message,
+    previous: prev.language,
+    history: args.recentChat,
+  });
+
   const state = {
     ...prev,
+    language,
     conversationProfile,
     lastSellerIntent: intent,
     memory: memoryWithProspect,

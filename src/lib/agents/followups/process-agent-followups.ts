@@ -3,7 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAIReply } from "@/lib/agents/business-context/reply";
 import { resolvePublicPersonaForAgent } from "@/lib/chat/agent-identity-manager";
-import { isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";
+import { conversationsUpdateWithOptionalColumnFallback, isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";
 
 type StoredMessage = { role: "user" | "assistant"; content: string; ts: string };
 
@@ -32,7 +32,7 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
     const conversationId = String((row as any).conversation_id);
     const payload = ((row as any).payload ?? {}) as {
       lastUserMessage?: string;
-      lang?: "fr" | "en";
+      lang?: "fr" | "en" | "es";
       conversationState?: unknown;
       personaKey?: string;
     };
@@ -103,7 +103,11 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
       const convStateRaw = (conv as any)?.conversation_state;
       const fromPayload = typeof payload.conversationState === "object" && payload.conversationState ? payload.conversationState : {};
       const fromDb = typeof convStateRaw === "object" && convStateRaw ? convStateRaw : {};
-      const mergedBehaviorState = { ...fromDb, ...fromPayload, language: payload.lang === "en" ? "en" : "fr" } as any;
+      const mergedBehaviorState = {
+        ...fromDb,
+        ...fromPayload,
+        language: payload.lang === "en" || payload.lang === "es" || payload.lang === "fr" ? payload.lang : (fromPayload as any).language ?? (fromDb as any).language ?? "fr",
+      } as any;
 
       let followupText = "";
       try {
@@ -126,7 +130,9 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
         followupText =
           payload.lang === "en"
             ? "Thanks for waiting — tell me the model you want and I’ll confirm stock and price."
-            : "Merci d’avoir attendu — dites-moi le modèle exact et je vous confirme prix et dispo.";
+            : payload.lang === "es"
+              ? "Gracias por esperar — indíqueme el modelo que quiere y confirmo stock y precio."
+              : "Merci d’avoir attendu — dites-moi le modèle exact et je vous confirme prix et dispo.";
       }
 
       const trimmed = String(followupText ?? "").trim();
@@ -139,15 +145,13 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
       const msgs = [...rawHistory] as StoredMessage[];
       msgs.push({ role: "assistant", content: trimmed, ts: new Date().toISOString() });
 
-      await admin
-        .from("conversations")
-        .update({
-          messages: msgs as any,
-          last_message_at: new Date().toISOString(),
-          last_ai_message_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conversationId);
+      const { error: convUpErr } = await conversationsUpdateWithOptionalColumnFallback(admin, conversationId, {
+        messages: msgs as any,
+        last_message_at: new Date().toISOString(),
+        last_ai_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      if (convUpErr) console.error("[CHAT_METADATA_UPDATE_FAILED] followup conversations update", convUpErr);
 
       await admin.from("pending_agent_followups").update({ status: "sent", message: trimmed }).eq("id", id);
 

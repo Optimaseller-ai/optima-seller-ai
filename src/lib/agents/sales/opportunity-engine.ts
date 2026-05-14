@@ -66,9 +66,9 @@ export function runSalesOpportunityEngine(args: {
   const cross = buildCrossSellSuggestions({ userText: args.message, catalogBlob: args.productsText });
 
   const linesFr: string[] = [];
-  linesFr.push("MODE « COMMERCIAL ACTIF » (excellent vendeur humain):");
-  linesFr.push("- Ne pas seulement répondre: vendez, engagez, orientez, proposez, faites avancer (réservation, commande, livraison, paiement, rappel) — toujours avec naturel.");
-  linesFr.push("- Prendre l’initiative: si le prospect dit juste « bonjour », proposer une ouverture utile (ex. orienter budget / famille de produits / dispo), une seule question max ou une proposition courte.");
+  linesFr.push("MODE « COMMERCIAL ACTIF » (uniquement si le message du prospect parle déjà produit / prix / commande — pas sur un simple bonjour ou « comment allez-vous »):");
+  linesFr.push("- Ne pas seulement répondre: orienter, proposer, faire avancer — toujours avec naturel, jamais agressif.");
+  linesFr.push("- Si le prospect est encore sur la politesse ou une question personnelle : rester humain, sans pousser la vente dans le même message.");
   linesFr.push("- Interdit: « comment puis-je vous aider », ton assistant, pression, spam.");
   linesFr.push("");
   linesFr.push(`Niveau de closing conseillé pour ce tour: **${closingLevel}**.`);
@@ -107,9 +107,9 @@ export function runSalesOpportunityEngine(args: {
   }
 
   const linesEn: string[] = [];
-  linesEn.push("ACTIVE SALES MODE (top human salesperson):");
-  linesEn.push("- Don’t only answer: sell, steer, propose, move forward (hold, order, delivery, payment) — always natural, never pushy.");
-  linesEn.push("- Take initiative on bare greetings: offer useful direction (budget / category / availability), at most one question.");
+  linesEn.push("ACTIVE SALES MODE (only when the prospect’s message is already about product/price/order — not on a bare hello or “how are you”):");
+  linesEn.push("- Don’t only answer: steer, propose, move forward — always natural, never pushy.");
+  linesEn.push("- If they’re still on small talk / personal politeness: stay human, don’t force a sales pitch in the same message.");
   linesEn.push("- Banned: “how can I help”, assistant tone, spam, fake urgency.");
   linesEn.push("");
   linesEn.push(`Suggested closing strength this turn: **${closingLevel}**.`);

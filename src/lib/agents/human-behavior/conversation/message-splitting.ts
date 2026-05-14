@@ -14,11 +14,18 @@ function splitSentences(text: string): string[] {
   return parts.length ? parts : [t];
 }
 
+function collapseChunks(chunks: string[], maxChunks: 1 | 2): string[] {
+  const m = Math.max(1, Math.min(2, maxChunks));
+  if (chunks.length <= m) return chunks;
+  if (m === 1) return [chunks.join(" ").replace(/\s+/g, " ").trim()];
+  return chunks.slice(0, 2);
+}
+
 /**
  * Découpe parfois un long texte en plusieurs bulles courtes (style employé).
- * Déterministe via `seed`. Sinon un seul segment = texte entier.
+ * `maxChunks` : jamais plus de 2 bulles (évite l’effet « plusieurs mini-IA »).
  */
-export function maybeSplitAssistantMessage(text: string, seed: string): string[] {
+export function maybeSplitAssistantMessage(text: string, seed: string, maxChunks: 1 | 2 = 2): string[] {
   const raw = String(text ?? "").trim();
   if (!raw || raw.length < 160) return [raw];
 
@@ -29,16 +36,20 @@ export function maybeSplitAssistantMessage(text: string, seed: string): string[]
   const roll = seedHash(seed + raw) % 100;
   if (roll >= 20) return [raw];
 
+  let out: string[];
   if (sentences.length === 2) {
-    return [sentences[0]!, sentences[1]!];
+    out = [sentences[0]!, sentences[1]!];
+  } else {
+    const first = sentences[0]!;
+    const last = sentences[sentences.length - 1]!;
+    const middle = sentences.slice(1, -1).join(" ").trim();
+
+    if (middle.length >= 24) {
+      out = [first, middle, last].filter((x) => x.length > 0);
+    } else {
+      out = [first, sentences.slice(1).join(" ").trim()].filter((x) => x.length > 0);
+    }
   }
 
-  const first = sentences[0]!;
-  const last = sentences[sentences.length - 1]!;
-  const middle = sentences.slice(1, -1).join(" ").trim();
-
-  if (middle.length >= 24) {
-    return [first, middle, last].filter((x) => x.length > 0).slice(0, 3);
-  }
-  return [first, sentences.slice(1).join(" ").trim()].filter((x) => x.length > 0);
+  return collapseChunks(out, maxChunks);
 }

@@ -44,9 +44,46 @@ export function stripTrailingScriptClosings(text: string): string {
     .trim();
 }
 
+/** Tournures « support client bancaire / IA » à retirer même si absentes de la blacklist exacte. */
+export function stripCorporateEmotionalClichés(text: string): string {
+  let out = String(text ?? "");
+  const patterns: RegExp[] = [
+    /\bje\s+comprends\s+votre\s+déception\b[\s.,!?…:;-]*/gi,
+    /\bje\s+comprends\s+parfaitement\b[\s.,!?…:;-]*/gi,
+    /\bje\s+comprends\s+ce\s+que\s+vous\s+ressentez\b[\s.,!?…:;-]*/gi,
+    /\bje\s+suis\s+là\s+pour\s+(vous\s+)?aider\b[\s.,!?…:;-]*/gi,
+    /\bje\s+suis\s+là\s+pour\s+résoudre(\s+cela|\s+ça)?\b[\s.,!?…:;-]*/gi,
+    /\bvotre\s+satisfaction\s+est\s+(notre|ma)\s+priorité\b[\s.,!?…:;-]*/gi,
+    /\bnous\s+nous\s+excusons\b[\s.,!?…:;-]*/gi,
+    /\bmerci\s+de\s+votre\s+patience\b[\s.,!?…:;-]*/gi,
+    /\bje\s+vais\s+faire\s+le\s+nécessaire\b[\s.,!?…:;-]*/gi,
+    /\bpuis-je\s+quand\s+même\s+vous\s+proposer\b[^.!?…]*[.!?…]?/gi,
+    /\bI\s+understand\s+your\s+disappointment\b[\s.,!?…:;-]*/gi,
+    /\bI\s+understand\s+what\s+you(?:'re|\s+are)\s+feeling\b[\s.,!?…:;-]*/gi,
+    /\bI\s+understand\s+perfectly\b[\s.,!?…:;-]*/gi,
+    /\bI\s*'?\s*m\s+here\s+to\s+help\b[\s.,!?…:;-]*/gi,
+    /\bI\s*'?\s*m\s+here\s+to\s+resolve(\s+this)?\b[\s.,!?…:;-]*/gi,
+    /\byour\s+satisfaction\s+is\s+our\s+priority\b[\s.,!?…:;-]*/gi,
+    /\bwe\s+apologize\b[\s.,!?…:;-]*/gi,
+    /\bthank\s+you\s+for\s+your\s+patience\b[\s.,!?…:;-]*/gi,
+    /\bI\s*'?\s*ll\s+do\s+what(?:'s|\s+is)\s+necessary\b[\s.,!?…:;-]*/gi,
+    /\bmay\s+I\s+still\s+offer\b[^.!?…]*[.!?…]?/gi,
+    /\bentiendo\s+su\s+decepci[oó]n\b[\s.,!?…:;-]*/gi,
+    /\bestoy\s+aqu[ií]\s+para\s+(ayudarle|resolverlo)\b[\s.,!?…:;-]*/gi,
+    /\bgracias\s+por\s+su\s+paciencia\b[\s.,!?…:;-]*/gi,
+  ];
+  for (const re of patterns) out = out.replace(re, " ");
+  return out
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.!?…])/g, "$1")
+    .replace(/^\s*[.,;]\s*/g, "")
+    .trim();
+}
+
 export function runAntiAiFilterPass(text: string, extraBlacklist?: string[]): AntiAiFilterResult {
   const a = stripBlacklistedPhrases(text, extraBlacklist);
   const b = stripAssistantMetaLanguage(a.text);
-  const c = stripTrailingScriptClosings(b);
-  return { text: c, removedPhraseHits: a.removedPhraseHits };
+  const c = stripCorporateEmotionalClichés(b);
+  const d = stripTrailingScriptClosings(c);
+  return { text: d, removedPhraseHits: a.removedPhraseHits };
 }

@@ -5,7 +5,7 @@ import { openRouterChat } from "@/lib/ai/openrouter";
 import { getBusinessContext } from "@/lib/agents/business-context/catalog-rag";
 import { resolveBusinessTimezone } from "@/lib/agents/timing/business-timezone";
 import { getCommercialAgentById } from "@/lib/agents/personality/commercial-agents";
-import { isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";
+import { conversationsUpdateWithOptionalColumnFallback, isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";
 import { getNextRelanceAt, isClosedStatus, type ConversationStatus } from "@/lib/agents/followups/relance-schedule";
 import { smartRelanceSystemPrompt, smartRelanceUserPrompt } from "@/lib/agents/followups/smart-sales-followups";
 
@@ -88,7 +88,12 @@ export async function runRelanceForConversation(args: { conversationId: string; 
   const businessLabel = String(prof?.business_name ?? prof?.shop_name ?? agent.name ?? "Boutique").trim() || "Boutique";
   const profLang = String((prof as any)?.language ?? "").toLowerCase();
   const stateLang = (conv as any)?.conversation_state?.language;
-  const lang: "fr" | "en" = profLang.startsWith("en") || stateLang === "en" ? "en" : "fr";
+  const lang: "fr" | "en" | "es" =
+    stateLang === "es" || profLang.startsWith("es")
+      ? "es"
+      : stateLang === "en" || profLang.startsWith("en")
+        ? "en"
+        : "fr";
 
   const userPrompt = smartRelanceUserPrompt({
     relanceLabel: label,
@@ -118,19 +123,19 @@ export async function runRelanceForConversation(args: { conversationId: string; 
     }).iana,
   });
 
-  const { error: upErr } = await admin
-    .from("conversations")
-    .update({
-      messages: updatedHistory as any,
-      status: status === "active" ? "pending" : status,
-      relance_count: nextRelanceNumber,
-      last_message_at: nowIso,
-      last_ai_message_at: nowIso,
-      next_relance_at: nextRelanceAt,
-      updated_at: nowIso,
-    })
-    .eq("id", conv.id);
-  if (upErr) throw upErr;
+  const { error: upErr } = await conversationsUpdateWithOptionalColumnFallback(admin, conv.id, {
+    messages: updatedHistory as any,
+    status: status === "active" ? "pending" : status,
+    relance_count: nextRelanceNumber,
+    last_message_at: nowIso,
+    last_ai_message_at: nowIso,
+    next_relance_at: nextRelanceAt,
+    updated_at: nowIso,
+  });
+  if (upErr) {
+    console.error("[RELANCE_UPDATE_FAILED]", upErr);
+    return { ok: false as const, reason: "persist_failed" as const };
+  }
 
   return { ok: true as const, conversationId: conv.id, relance: clean, relanceCount: nextRelanceNumber, nextRelanceAt };
 }

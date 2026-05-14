@@ -10,3 +10,4 @@ export {
   type PremiumSellerProfile,
   type SellerLanguage,
 } from "./seller-prompts";
+export type { ProspectTurnIntent } from "@/lib/agents/human-behavior/response-orchestrator";

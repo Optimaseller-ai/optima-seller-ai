@@ -6,7 +6,7 @@ import type { SellerBehaviorConversationState } from "@/lib/agents/memory/conver
  * Vue compacte pour prompts ou moteur comportemental (pas de mutation).
  */
 export type ConversationMemorySnapshot = {
-  language?: "fr" | "en";
+  language?: "fr" | "en" | "es";
   mood?: string;
   toneMode?: string;
   recentTopics: string[];

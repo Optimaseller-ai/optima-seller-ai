@@ -75,7 +75,8 @@ export type ConversationalEtiquette = {
 
 /** État enrichi sérialisé dans la session chat (localStorage + API). */
 export type SellerBehaviorConversationState = {
-  language?: "fr" | "en";
+  /** Langue conversationnelle persistée (détection auto + sticky). */
+  language?: "fr" | "en" | "es";
   preferences?: { blacklist?: string[] };
   mood?: string;
   memory?: string[];

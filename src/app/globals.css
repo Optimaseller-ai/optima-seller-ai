@@ -1,0 +1,630 @@
+@import "tailwindcss";
+
+:root {
+  /* Palette
+     Primary green: #16A34A
+     Dark navy: #0F172A
+     Soft background: #F8FAFC
+     Accent gold: #F59E0B
+     Text: #111827
+  */
+  --background: 210 40% 98%; /* #F8FAFC */
+  --foreground: 222 47% 11%; /* #111827 */
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 142 71% 45%;
+
+  --primary: 142 76% 36%; /* #16A34A */
+  --primary-foreground: 0 0% 100%;
+  --accent: 38 92% 50%; /* #F59E0B */
+  --accent-foreground: 222 47% 11%;
+
+  --radius: 16px;
+
+  --brand-green: #16a34a;
+  --brand-gold: #f59e0b;
+  --brand-navy: #0f172a;
+
+  /* Light premium background tokens */
+  --bg-0: #f7fafc;
+  --bg-1: #f2f7ff;
+  --glow-green: rgba(52, 120, 103, 0.09);
+  --glow-blue: rgba(99, 125, 168, 0.11);
+  --glow-violet: rgba(120, 113, 160, 0.07);
+  --glow-amber: rgba(180, 155, 120, 0.06);
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --radius: var(--radius);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 160 100% 33%;
+    --primary: 160 100% 33%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 40 100% 48%;
+    --accent-foreground: 210 40% 98%;
+  }
+}
+
+/* Manual theme override (set on documentElement) */
+:root[data-theme="light"] {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 142 71% 45%;
+  --primary: 142 76% 36%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 38 92% 50%;
+  --accent-foreground: 222 47% 11%;
+
+  --brand-green: #16a34a;
+  --brand-gold: #f59e0b;
+  --brand-navy: #0f172a;
+
+  --bg-0: #f7fafc;
+  --bg-1: #f2f7ff;
+  --glow-green: rgba(52, 120, 103, 0.09);
+  --glow-blue: rgba(99, 125, 168, 0.11);
+  --glow-violet: rgba(120, 113, 160, 0.07);
+  --glow-amber: rgba(180, 155, 120, 0.06);
+}
+
+:root[data-theme="dark"] {
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 142 71% 45%;
+  --primary: 142 76% 36%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 38 92% 50%;
+  --accent-foreground: 222 47% 11%;
+
+  --brand-green: #16a34a;
+  --brand-gold: #f59e0b;
+  --brand-navy: #0f172a;
+
+  --bg-0: #f7fafc;
+  --bg-1: #f2f7ff;
+  --glow-green: rgba(52, 120, 103, 0.09);
+  --glow-blue: rgba(99, 125, 168, 0.11);
+  --glow-violet: rgba(120, 113, 160, 0.07);
+  --glow-amber: rgba(180, 155, 120, 0.06);
+}
+
+body {
+  background: linear-gradient(180deg, var(--bg-0), var(--bg-1));
+  color: hsl(var(--foreground));
+  overflow-x: hidden;
+  transition: background 260ms cubic-bezier(0.2, 0.9, 0.2, 1), color 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+}
+
+/* Chat wallpaper presets (set on documentElement) */
+:root[data-wallpaper="dots"] body {
+  background:
+    radial-gradient(520px 420px at 14% 12%, var(--glow-blue), transparent 62%),
+    radial-gradient(560px 460px at 86% 10%, var(--glow-green), transparent 62%),
+    radial-gradient(520px 520px at 64% 86%, var(--glow-violet), transparent 62%),
+    radial-gradient(520px 520px at 18% 92%, var(--glow-amber), transparent 62%),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1));
+}
+:root[data-wallpaper="paper"] body {
+  background:
+    radial-gradient(rgba(15, 23, 42, 0.09) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1));
+  background-size: 26px 26px, auto;
+}
+:root[data-wallpaper="mesh"] body {
+  background:
+    radial-gradient(700px 520px at 20% 0%, rgba(59, 130, 246, 0.18), transparent 60%),
+    radial-gradient(820px 620px at 95% 10%, rgba(34, 197, 94, 0.18), transparent 62%),
+    radial-gradient(780px 720px at 60% 92%, rgba(139, 92, 246, 0.14), transparent 62%),
+    radial-gradient(640px 640px at 10% 88%, rgba(251, 191, 36, 0.12), transparent 60%),
+    conic-gradient(
+      from 210deg at 50% 50%,
+      rgba(59, 130, 246, 0.08),
+      rgba(34, 197, 94, 0.08),
+      rgba(251, 191, 36, 0.06),
+      rgba(139, 92, 246, 0.07),
+      rgba(59, 130, 246, 0.08)
+    ),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1));
+  background-blend-mode: screen, screen, screen, screen, overlay, normal;
+}
+:root[data-wallpaper="plain"] body {
+  background: linear-gradient(180deg, var(--bg-0), var(--bg-1));
+}
+
+/* Premium background layer helpers */
+.optima-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -10;
+  overflow: hidden;
+}
+.optima-bg::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(520px 420px at 14% 12%, var(--glow-blue), transparent 62%),
+    radial-gradient(560px 460px at 86% 10%, var(--glow-green), transparent 62%),
+    radial-gradient(520px 520px at 64% 86%, var(--glow-violet), transparent 62%),
+    radial-gradient(520px 520px at 18% 92%, var(--glow-amber), transparent 62%);
+  filter: blur(26px);
+  opacity: 0.95;
+  transform: translateZ(0);
+}
+.optima-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.22;
+  mask-image: radial-gradient(closest-side at 50% 22%, black 35%, transparent 78%);
+}
+
+.optima-chat-shell {
+  background:
+    radial-gradient(720px 420px at 12% 0%, rgba(248, 250, 252, 0.95), transparent 58%),
+    radial-gradient(640px 380px at 88% 8%, rgba(241, 245, 249, 0.88), transparent 55%),
+    radial-gradient(520px 480px at 50% 100%, rgba(226, 232, 240, 0.35), transparent 62%),
+    linear-gradient(165deg, #fafbfc 0%, #f4f6f9 42%, #f1f4f8 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.optima-chat-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 255, 255, 0.85), transparent 52%),
+    radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.35), transparent 38%);
+  filter: blur(24px);
+  opacity: 0.85;
+  z-index: 0;
+}
+
+.optima-chat-shell::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.055;
+  background-image: radial-gradient(rgba(51, 65, 85, 0.45) 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
+  mask-image: radial-gradient(ellipse 120% 80% at 50% 45%, black 0%, transparent 72%);
+  z-index: 0;
+}
+
+.optima-chat-shell [data-premium-hover="true"] {
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.optima-chat-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Native-feel scroll: invisible until hover (conversation list) */
+.chat-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.chat-scroll:hover {
+  scrollbar-color: rgba(100, 116, 139, 0.14) transparent;
+}
+
+/* Zone conversation uniquement : défilement fluide, inertie tactile, pas de chaînage au body */
+.chat-thread-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.18) transparent;
+}
+.chat-thread-scroll:hover {
+  scrollbar-color: rgba(71, 85, 105, 0.35) transparent;
+}
+.chat-thread-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.chat-thread-scroll::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.22);
+  border-radius: 999px;
+}
+.chat-thread-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Panneaux latéraux : pas de scroll interne */
+.chat-sidebar-panel {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+@media (max-width: 768px) {
+  .optima-chat-shell {
+    min-height: 100dvh;
+  }
+}
+
+/* Ultra-fine scrollbar — semi-transparent on hover only */
+.chat-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+.chat-scroll:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(71, 85, 105, 0.16), rgba(148, 163, 184, 0.1));
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Thread canvas: subtle grain + depth (conversation area only) */
+.chat-thread-canvas {
+  position: relative;
+}
+.chat-thread-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.048;
+  background-image:
+    radial-gradient(rgba(15, 23, 42, 0.38) 0.45px, transparent 0.45px),
+    linear-gradient(125deg, rgba(52, 120, 103, 0.03) 0%, transparent 42%, rgba(99, 125, 168, 0.025) 100%);
+  background-size:
+    5px 5px,
+    100% 100%;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+.chat-thread-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.62;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, transparent 30%, transparent 70%, rgba(241, 245, 249, 0.72) 100%);
+}
+.chat-thread-canvas[data-thread-dark="1"]::before {
+  opacity: 0.042;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.12) 0.45px, transparent 0.45px),
+    linear-gradient(125deg, rgba(52, 120, 103, 0.05) 0%, transparent 45%, rgba(99, 125, 168, 0.04) 100%);
+  background-size: 5px 5px, 100% 100%;
+}
+.chat-thread-canvas[data-thread-dark="1"]::after {
+  opacity: 0.5;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 32%, transparent 68%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+/* Cinematic lighting helpers */
+.cinema-center::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(680px 420px at 50% 0%, rgba(255, 255, 255, 0.72), transparent 58%),
+    radial-gradient(900px 560px at 50% 55%, rgba(52, 120, 103, 0.04), transparent 62%),
+    radial-gradient(760px 520px at 50% 100%, rgba(99, 125, 168, 0.05), transparent 68%);
+  opacity: 0.42;
+  filter: blur(20px);
+}
+.cinema-center::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(closest-side at 50% 48%, transparent 55%, rgba(15, 23, 42, 0.028) 100%);
+  opacity: 0.9;
+}
+
+.message-glow {
+  position: relative;
+}
+.message-glow::before {
+  content: "";
+  position: absolute;
+  inset: -8px -14px;
+  border-radius: 24px;
+  pointer-events: none;
+  background:
+    radial-gradient(200px 120px at 35% 50%, rgba(52, 120, 103, 0.06), transparent 64%),
+    radial-gradient(220px 130px at 72% 45%, rgba(99, 125, 168, 0.05), transparent 66%);
+  opacity: 0;
+  transform: translateY(2px) scale(0.99);
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.message-glow:hover::before,
+.message-glow[data-active="true"]::before {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Glass utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.10);
+  backdrop-filter: blur(14px);
+}
+.glass-soft {
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+/* Premium defaults */
+::selection {
+  background: rgba(52, 120, 103, 0.18);
+}
+
+/* Subtle, premium interactions */
+@media (prefers-reduced-motion: no-preference) {
+  :root {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Premium easing helper (opt-in) */
+.ease-premium {
+  transition-timing-function: cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chatInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(14px) scale(0.98);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes chatInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-14px) scale(0.98);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(0) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes chatPop {
+  0% {
+    transform: translateY(4px) scale(0.98);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(0) scale(1.01);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes typingDot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 0.95;
+  }
+}
+
+@keyframes onlineBreath {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.0);
+  }
+  55% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.12);
+  }
+}
+
+@keyframes onlinePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  60% {
+    transform: scale(2.15);
+    opacity: 0;
+  }
+}
+
+@keyframes conversationPulse {
+  0% {
+    transform: translateY(0);
+  }
+  55% {
+    transform: translateY(-0.5px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes chatEnter {
+  0% {
+    transform: translateY(10px) scale(0.99);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Immersive public chat: reduce "browser page" feeling */
+:root[data-immersive-chat="1"] body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
+  overflow: hidden;
+  height: 100dvh;
+}
+
+@supports (padding: max(0px)) {
+  :root[data-immersive-chat="1"] body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+@keyframes floatSoft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes glowSweep {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(140%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .float-soft {
+    animation: floatSoft 5.5s ease-in-out infinite;
+    will-change: transform;
+  }
+  .glow-sweep::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(90deg, transparent, rgba(52, 120, 103, 0.08), rgba(99, 125, 168, 0.07), transparent);
+    transform: translateX(-140%) skewX(-18deg);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .glow-sweep:hover::after {
+    animation: glowSweep 900ms ease-out;
+  }
+}

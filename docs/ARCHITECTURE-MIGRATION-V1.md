@@ -61,14 +61,24 @@ src/
 
 ### Activer le proxy Vercel → Railway
 
-Dans `.env.local` (frontend) :
+Dans **Vercel → Project → Settings → Environment Variables → Production** (les deux sont obligatoires) :
 
 ```env
 OPTIMA_AI_BACKEND_URL=https://your-service.up.railway.app
 OPTIMA_AI_BACKEND_SECRET=your-shared-secret-min-16-chars
 ```
 
-Sans ces variables, le frontend continue d’appeler OpenRouter **directement** (comportement actuel).
+Sans **les deux** variables, Vercel utilise OpenRouter en local (`[OPTIMA_PROXY] fallback_local_openrouter`).
+
+### Vérifier en production
+
+1. `GET https://your-app.vercel.app/api/debug/openrouter-proxy`  
+   → `backendEnabled: true`, `mode: "railway"`
+2. Envoyer un message chat → logs Vercel :
+   - `[OPTIMA_PROXY] using_railway_backend`
+   - `[OPTIMA_PROXY] railway_request_start`
+3. Logs Railway :
+   - `[OPTIMA_AI_BACKEND] incoming_openrouter_chat`
 
 ### Fichiers touchés
 

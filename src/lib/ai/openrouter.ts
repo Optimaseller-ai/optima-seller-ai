@@ -2,11 +2,14 @@ import "server-only";
 
 import { Agent } from "undici";
 import { serverEnv } from "@/lib/server-env";
-import {
+import { logOpenRouterProxyConfigOnce } from "@/lib/ai/openrouter-proxy-config";
+import { openRouterChatViaBackend, openRouterEmbedViaBackend } from "@/lib/ai/openrouter-backend-client";
+
+export {
   isOpenRouterDelegatedToBackend,
-  openRouterChatViaBackend,
-  openRouterEmbedViaBackend,
-} from "@/lib/ai/openrouter-backend-client";
+  logOpenRouterProxyConfigOnce,
+  resolveOpenRouterProxyConfig,
+} from "@/lib/ai/openrouter-proxy-config";
 
 export const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const OPENROUTER_EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
@@ -123,7 +126,10 @@ export async function openRouterChat(args: {
     compressed?: boolean;
   };
 }) {
-  if (isOpenRouterDelegatedToBackend()) {
+  const proxyCfg = logOpenRouterProxyConfigOnce();
+
+  if (proxyCfg.backendEnabled) {
+    console.log("[OPTIMA_PROXY] using_railway_backend", { operation: "chat", messageCount: args.messages.length });
     return openRouterChatViaBackend({
       model: args.model ?? serverEnv.OPENROUTER_MODEL,
       messages: args.messages,
@@ -131,6 +137,11 @@ export async function openRouterChat(args: {
       maxTokens: args.maxTokens,
     });
   }
+
+  console.warn("[OPTIMA_PROXY] fallback_local_openrouter", {
+    operation: "chat",
+    reasons: proxyCfg.disableReasons,
+  });
 
   if (!serverEnv.OPENROUTER_API_KEY) {
     console.error("[openRouterChat] Missing OPENROUTER_API_KEY");
@@ -322,13 +333,21 @@ export async function openRouterChat(args: {
 }
 
 export async function openRouterEmbed(args: { model?: string; input: string; timeoutMs?: number }) {
-  if (isOpenRouterDelegatedToBackend()) {
+  const proxyCfg = logOpenRouterProxyConfigOnce();
+
+  if (proxyCfg.backendEnabled) {
+    console.log("[OPTIMA_PROXY] using_railway_backend", { operation: "embed", inputLength: args.input.length });
     return openRouterEmbedViaBackend({
       model: args.model ?? serverEnv.OPENROUTER_EMBEDDING_MODEL,
       input: args.input,
       timeoutMs: args.timeoutMs,
     });
   }
+
+  console.warn("[OPTIMA_PROXY] fallback_local_openrouter", {
+    operation: "embed",
+    reasons: proxyCfg.disableReasons,
+  });
 
   if (!serverEnv.OPENROUTER_API_KEY) {
     console.error("[openRouterEmbed] Missing OPENROUTER_API_KEY");

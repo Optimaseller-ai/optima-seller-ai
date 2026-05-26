@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClientSafe } from "@/lib/supabase/admin";
 import { openRouterChat, openRouterEmbed } from "@/lib/ai/openrouter";
+import { logOpenRouterProxyConfigOnce } from "@/lib/ai/openrouter-proxy-config";
 import { resolveBusinessTimezone } from "@/lib/agents/timing/business-timezone";
 import {
   searchBusinessKnowledge,
@@ -944,6 +945,8 @@ export async function generateAIReply(args: {
     args.conversationState?.language === "en" ? "en" : args.conversationState?.language === "es" ? "es" : "fr";
 
   const fallbackTopics = businessKnowledge.topics ?? knowledgeSearch.topics ?? [];
+
+  logOpenRouterProxyConfigOnce();
 
   const llmRun = await safeEngineExecute({
     engine: "openrouter",

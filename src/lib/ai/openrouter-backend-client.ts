@@ -1,50 +1,87 @@
 import "server-only";
 
 import type { OpenRouterMessage } from "./openrouter";
-
-function backendBaseUrl(): string | null {
-  const url = process.env.OPTIMA_AI_BACKEND_URL?.trim().replace(/\/$/, "");
-  return url && url.length > 0 ? url : null;
-}
-
-function backendSecret(): string | null {
-  const s = process.env.OPTIMA_AI_BACKEND_SECRET?.trim();
-  return s && s.length >= 16 ? s : null;
-}
-
-export function isOpenRouterDelegatedToBackend(): boolean {
-  return Boolean(backendBaseUrl() && backendSecret());
-}
+import {
+  logOpenRouterProxyConfigOnce,
+  resolveOpenRouterProxyConfig,
+} from "./openrouter-proxy-config";
 
 async function postBackend<T>(path: string, body: unknown): Promise<T> {
-  const base = backendBaseUrl();
-  const secret = backendSecret();
-  if (!base || !secret) {
-    throw new Error("OPTIMA_AI_BACKEND_URL or OPTIMA_AI_BACKEND_SECRET not configured");
+  const cfg = logOpenRouterProxyConfigOnce();
+  if (!cfg.backendEnabled || !cfg.backendUrl) {
+    throw new Error(
+      `OpenRouter Railway proxy not configured (${cfg.disableReasons.join(", ") || "unknown"})`,
+    );
   }
 
-  const resp = await fetch(`${base}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+  const secret = process.env.OPTIMA_AI_BACKEND_SECRET?.trim();
+  if (!secret) {
+    throw new Error("OPTIMA_AI_BACKEND_SECRET missing at request time");
+  }
+
+  const url = `${cfg.backendUrl}${path}`;
+  const started = Date.now();
+
+  console.log("[OPTIMA_PROXY] railway_request_start", {
+    path,
+    host: (() => {
+      try {
+        return new URL(cfg.backendUrl!).host;
+      } catch {
+        return cfg.backendUrl;
+      }
+    })(),
   });
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    console.error("[OPTIMA_PROXY] railway_request_network_error", {
+      path,
+      durationMs: Date.now() - started,
+      message: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 
   const json = (await resp.json().catch(() => ({}))) as T & { error?: string; message?: string };
 
   if (!resp.ok) {
-    const msg = typeof json?.message === "string" ? json.message : json?.error ?? `Backend HTTP ${resp.status}`;
+    console.error("[OPTIMA_PROXY] railway_request_http_error", {
+      path,
+      status: resp.status,
+      durationMs: Date.now() - started,
+      error: json?.error ?? json?.message,
+    });
+    const msg =
+      typeof json?.message === "string"
+        ? json.message
+        : typeof json?.error === "string"
+          ? json.error
+          : `Backend HTTP ${resp.status}`;
     const err = new Error(msg) as Error & { status?: number };
     err.status = resp.status;
     throw err;
   }
 
+  console.log("[OPTIMA_PROXY] railway_request_ok", {
+    path,
+    status: resp.status,
+    durationMs: Date.now() - started,
+  });
+
   return json;
 }
 
-/** Appel OpenRouter via Railway — remplace l’appel direct serverless. */
+/** Appel OpenRouter via Railway — remplace l'appel direct serverless. */
 export async function openRouterChatViaBackend(args: {
   model?: string;
   messages: OpenRouterMessage[];
@@ -62,7 +99,6 @@ export async function openRouterChatViaBackend(args: {
     throw new Error("Backend returned empty OpenRouter content");
   }
 
-  console.log("[OPTIMA_AI] openrouter_via_backend", { messageCount: args.messages.length });
   return data.content.trim();
 }
 

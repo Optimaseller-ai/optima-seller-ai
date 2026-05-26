@@ -37,6 +37,7 @@ import {
 } from "@/lib/chat/pipeline";
 import { fetchAgentWithRetry } from "@/lib/chat/agent-session-cache";
 import { dedupeThreadMessages } from "@/lib/chat/dedupe-thread-messages";
+import { logOpenRouterProxyConfigOnce } from "@/lib/ai/openrouter-proxy-config";
 
 export const runtime = "nodejs";
 
@@ -129,6 +130,8 @@ const BodySchema = z.object({
 type StoredMessage = { role: "user" | "assistant"; content: string; ts: string };
 
 export async function POST(req: Request) {
+  logOpenRouterProxyConfigOnce();
+
   const json = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(json);
   

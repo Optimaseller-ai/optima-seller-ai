@@ -76,7 +76,7 @@ async function runSchemaHealthCheck(): Promise<void> {
 
   const selectCols = ["id", ...CONVERSATIONS_HEALTH_COLUMNS].join(",");
   const result = await withTimeout(
-    admin.from("conversations").select(selectCols).limit(1),
+    Promise.resolve(admin.from("conversations").select(selectCols).limit(1)),
     SCHEMA_CHECK_TIMEOUT_MS,
   );
 
@@ -86,7 +86,7 @@ async function runSchemaHealthCheck(): Promise<void> {
     return;
   }
 
-  const { error } = result;
+  const { error } = result as { error: { code?: string; message?: string } | null };
   const missing: string[] = [];
 
   if (error && isPostgrestUnknownColumnError(error)) {

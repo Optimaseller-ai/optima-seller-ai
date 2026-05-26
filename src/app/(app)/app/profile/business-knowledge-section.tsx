@@ -3,7 +3,11 @@
 import { BookOpen, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { saveProfileBusinessKnowledge, addProfileBusinessFaq, deleteProfileBusinessFaq } from "./business-knowledge-actions";
+import {
+  saveProfileBusinessKnowledgeFormAction,
+  addProfileBusinessFaqFormAction,
+  deleteProfileBusinessFaqFormAction,
+} from "./business-knowledge-actions";
 import type { BusinessFaqEntry } from "@/lib/business-knowledge/types";
 import type { BusinessKnowledgeSettingsRow } from "@/lib/business-knowledge/types";
 import type { ProfileIdentityForKnowledge } from "@/lib/business-knowledge/types";
@@ -75,7 +79,7 @@ export function BusinessKnowledgeSection({
         <CardContent className="space-y-4">
           <IdentitySummary identity={identity} />
 
-          <form action={saveProfileBusinessKnowledge} className="grid gap-3">
+          <form action={saveProfileBusinessKnowledgeFormAction} className="grid gap-3">
             <input
               name="served_cities_extra"
               defaultValue={servedExtra.join(", ")}
@@ -188,7 +192,7 @@ export function BusinessKnowledgeSection({
           <CardDescription>Réponses fréquentes que l'agent peut citer naturellement.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form action={addProfileBusinessFaq} className="grid gap-3">
+          <form action={addProfileBusinessFaqFormAction} className="grid gap-3">
             <select name="category" className={inputClass} defaultValue="delivery">
               <option value="delivery">Livraison</option>
               <option value="payment">Paiement</option>
@@ -216,7 +220,7 @@ export function BusinessKnowledgeSection({
                   <p className="mt-1 font-medium text-[var(--brand-navy)]">{f.question}</p>
                   <p className="mt-1 text-sm text-[var(--brand-navy)]/70">{f.answer}</p>
                 </div>
-                <form action={deleteProfileBusinessFaq.bind(null, f.id)}>
+                <form action={deleteProfileBusinessFaqFormAction.bind(null, f.id)}>
                   <Button type="submit" variant="outline" size="sm" className="bg-white">
                     Supprimer
                   </Button>

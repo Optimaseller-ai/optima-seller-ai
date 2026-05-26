@@ -1134,6 +1134,8 @@ export default function ChatClient({
       });
       const data = (await res.json().catch(() => null)) as {
         agent?: { id?: string };
+        persona?: CommercialAgentPublic;
+        messages?: StoredMessage[];
         message?: string;
         error?: string;
       } | null;
@@ -1153,10 +1155,10 @@ export default function ChatClient({
       setInitError(null);
       if (data?.agent?.id) setAgentId(String(data.agent.id));
 
-      const persona = (data?.persona as CommercialAgentPublic | undefined) ?? lockedPersona ?? null;
-      if (persona) {
+      const persona = data?.persona ?? lockedPersona ?? null;
+      if (persona && data) {
         const merged = getOrCreateSession(slug, persona);
-        const srv = Array.isArray(data.messages) ? (data.messages as StoredMessage[]) : [];
+        const srv = Array.isArray(data.messages) ? data.messages : [];
         if (!isConversationUiCleared(merged) && srv.length > merged.messages.length) {
           const nextSession: StoredChatSession = {
             ...merged,

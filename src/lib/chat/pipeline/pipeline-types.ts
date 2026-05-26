@@ -72,7 +72,13 @@ export type ConversationPipelineRuntimeSnapshot = {
   traceId: string;
   completedAt: string;
   totalMs: number;
-  responseMode: "instant_social" | "quick_human" | "llm" | "fallback";
+  responseMode:
+    | "instant_social"
+    | "quick_human"
+    | "llm"
+    | "fallback"
+    | "priority_critical"
+    | "priority_business_data";
   activeEngines: PipelineEngineId[];
   detectedEmotion?: string;
   socialSignal?: string;

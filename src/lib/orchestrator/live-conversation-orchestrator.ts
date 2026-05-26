@@ -176,7 +176,7 @@ export function runLiveConversationOrchestrator(input: LiveOrchestratorInput): L
     silencePauseMs: silence.pauseMs,
   });
 
-  const salesIntelLine = `Focus vente : ${salesIntel.guidance.primaryFocus} · Température : ${salesIntel.temperature.temperature}.`;
+  const salesIntelLine = `Focus vente : ${salesIntel.guidance.headline} · Température : ${salesIntel.temperature.temperature}.`;
 
   const promptGuidanceBlock = formatPromptGuidanceBlock({
     lang,

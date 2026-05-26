@@ -94,3 +94,16 @@ export async function deleteProfileBusinessFaq(faqId: string, _formData?: FormDa
   revalidatePath("/app/profile");
   return { ok: true as const };
 }
+
+/** Form actions for client components — return void per Next.js form action contract. */
+export async function saveProfileBusinessKnowledgeFormAction(formData: FormData): Promise<void> {
+  await saveProfileBusinessKnowledge(formData);
+}
+
+export async function addProfileBusinessFaqFormAction(formData: FormData): Promise<void> {
+  await addProfileBusinessFaq(formData);
+}
+
+export async function deleteProfileBusinessFaqFormAction(faqId: string, _formData: FormData): Promise<void> {
+  await deleteProfileBusinessFaq(faqId, _formData);
+}

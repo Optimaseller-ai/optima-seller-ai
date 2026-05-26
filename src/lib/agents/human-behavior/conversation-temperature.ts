@@ -38,7 +38,7 @@ export function inferConversationTemperatureLevel(args: {
 
   if (temp === "prêt_achat") return "confiance";
   if (temp === "chaleureux") return "engage";
-  if (temp === "intéressé" || temp === "curieux" || temp === "hésitant") return "ouvert";
+  if (temp === "intéressé" || temp === "hésitant") return "ouvert";
 
   if (args.preferredLanguageStyle === "warm") return "ouvert";
   if (args.preferredLanguageStyle === "formal") return "neutre";

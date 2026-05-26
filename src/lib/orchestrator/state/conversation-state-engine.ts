@@ -95,6 +95,6 @@ export function detectActiveSalesOpportunity(args: {
   return (
     intel.buying.intentScore >= 55 ||
     intel.temperature.temperature === "hot" ||
-    intel.temperature.temperature === "warm_high"
+    intel.temperature.temperature === "warm"
   );
 }

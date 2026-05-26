@@ -167,7 +167,7 @@ export function getContextualFallback(input: ContextualFallbackInput): string {
     return socialFallback(input);
   }
 
-  const frustrated = (input.frustrationLevel01 ?? 0) > 0.45 || input.kind === "empathetic";
+  const frustrated = (input.frustrationLevel01 ?? 0) > 0.45;
   if (frustrated) {
     const empathetic =
       lang === "en"

@@ -44,15 +44,17 @@ export class ConversationPipelineDebugger {
     this.traceId = traceId ?? `pipe_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  setMeta(partial: {
-    responseMode?: ConversationPipelineRuntimeSnapshot["responseMode"];
-    fallbackKind?: PipelineFallbackKind;
-    fallbackReason?: string;
-    detectedEmotion?: string;
-    socialSignal?: string;
-    selectedStrategy?: string;
-    automationTriggered?: boolean;
-  }) {
+  setMeta(
+    partial: {
+      responseMode?: ConversationPipelineRuntimeSnapshot["responseMode"];
+      fallbackKind?: PipelineFallbackKind;
+      fallbackReason?: string;
+      detectedEmotion?: string;
+      socialSignal?: string;
+      selectedStrategy?: string;
+      automationTriggered?: boolean;
+    } & Record<string, unknown>,
+  ) {
     if (partial.responseMode) this.responseMode = partial.responseMode;
     if (partial.fallbackKind) this.fallbackKind = partial.fallbackKind;
     if (partial.fallbackReason) this.fallbackReason = partial.fallbackReason;

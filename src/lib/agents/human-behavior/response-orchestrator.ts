@@ -72,6 +72,8 @@ export function buildPersonalWellbeingQuickReply(args: {
   message: string;
   lang: "fr" | "en" | "es";
   agentName?: string;
+  businessName?: string;
+  prospectProfile?: import("@/lib/agents/memory/prospect-profile").ProspectProfile;
 }): string | null {
   if (!isPersonalWellbeingTurn(args.message)) return null;
   if (args.lang === "en") return "Hey, how's it going? 😊 Feel free to ask me anything.";

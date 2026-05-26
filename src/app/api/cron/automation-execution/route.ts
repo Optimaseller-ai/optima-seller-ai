@@ -36,7 +36,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json(
     {
-      ok: stats.ok,
       ...stats,
       softFallbackSwept,
     },

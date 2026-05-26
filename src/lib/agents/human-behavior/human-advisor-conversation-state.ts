@@ -67,8 +67,7 @@ export function inferHumanAdvisorConversationState(input: InferHumanAdvisorState
     case "question_personnelle":
       return "ecoute";
     case "simple_discussion":
-    case "hors_sujet":
-      return (input.userTurnApprox ?? 99) <= 1 ? "ecoute" : "ecoute";
+      return "ecoute";
     case "demande_produit":
       return "recherche_produit";
     case "objection":
@@ -113,7 +112,7 @@ export function formatHumanAdvisorStatePromptBlock(
       verification: ["ESTADO HUMANO: verificación.", "- Puede decir «estoy mirando»; luego datos."],
       proposition: ["ESTADO HUMANO: propuesta.", "- Una opción clara."],
       hesitation: ["ESTADO HUMANO: duda.", "- Tranquilizar sin presión."],
-      negociacion: ["ESTADO HUMANO: negociación.", "- Claro, respetuoso."],
+      negociation: ["ESTADO HUMANO: negociación.", "- Claro, respetuoso."],
       cloture: ["ESTADO HUMANO: cierre.", "- Un paso siguiente, humano."],
       frustration: ["ESTADO HUMANO: fricción.", "- Breve y calmado."],
       relance_douce: ["ESTADO HUMANO: suave seguimiento.", "- Cortés, no insistente."],

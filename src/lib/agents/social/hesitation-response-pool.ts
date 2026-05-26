@@ -13,6 +13,7 @@ export type HesitationSubSignal =
 export type HesitationPoolInput = {
   message: string;
   agentName?: string;
+  businessName?: string;
   prospectProfile?: import("@/lib/agents/memory/prospect-profile").ProspectProfile;
   allowEmoji?: boolean;
   lang: "fr" | "en" | "es";

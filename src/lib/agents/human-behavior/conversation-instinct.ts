@@ -37,7 +37,7 @@ export function inferConversationInstinct(userMessage: string): ConversationInst
   if (/\b(prix|stock|livraison|commander|acheter|disponible|taille|couleur|price|buy)\b/i.test(m)) {
     return "propose";
   }
-  if (emotion === "sadness" || /\b(fatigu|stress|d[eé]prim)\b/i.test(m)) return "listen";
+  if (/\b(fatigu|stress|d[eé]prim|triste)\b/i.test(m)) return "listen";
   return "steady";
 }
 

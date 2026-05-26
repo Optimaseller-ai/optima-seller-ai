@@ -245,6 +245,7 @@ export function evaluateAutonomousAutomationDecision(
   const lastActive = ctx.lastProspectActiveAt ?? ctx.conversationState?.stats?.last_active_at ?? Date.now();
   const silentMs = now.getTime() - Number(lastActive);
 
+  const turns = ctx.conversationState?.stats?.turn_count ?? 0;
   if (input.isAutonomousFollowup && silentMs < SILENCE_BEFORE_FOLLOWUP_MS && turns > 0) {
     const resumeAt = new Date(Number(lastActive) + SILENCE_BEFORE_FOLLOWUP_MS).toISOString();
     reasons.push("Prospect silencieux depuis moins de 2h — pas de relance immédiate.");

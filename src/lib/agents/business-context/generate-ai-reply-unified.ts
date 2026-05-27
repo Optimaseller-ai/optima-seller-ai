@@ -52,6 +52,12 @@ export async function generateAIReplyUnified(
 ): Promise<GenerateAIReplyResult & { orchestratorPipelineDebug?: Record<string, unknown> }> {
   const { railwayMeta, ...localArgs } = args;
 
+  if (process.env.NODE_ENV === "production" && !isRailwayFullOrchestratorEnabled()) {
+    throw new Error(
+      "[OPTIMA_REPLY_PIPELINE] railway_full_orchestrator_required_in_production (configure OPTIMA_AI_BACKEND_URL + OPTIMA_AI_BACKEND_SECRET; do not disable OPTIMA_RAILWAY_FULL_ORCHESTRATOR)",
+    );
+  }
+
   if (isRailwayFullOrchestratorEnabled()) {
     if (!railwayMeta) {
       throw new Error("[OPTIMA_REPLY_PIPELINE] railway_full_orchestrator_enabled_missing_railwayMeta");

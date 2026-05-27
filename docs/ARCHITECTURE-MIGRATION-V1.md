@@ -57,7 +57,7 @@ src/
 - `session:{sessionId}` — état chaud
 - `timing_queue` — jobs read / typing / follow-up
 
-## Phase 1 — OpenRouter (en cours)
+## Phase 1 — OpenRouter (historique)
 
 ### Activer le proxy Vercel → Railway
 
@@ -88,28 +88,34 @@ Sans **les deux** variables, Vercel utilise OpenRouter en local (`[OPTIMA_PROXY]
 | `src/lib/ai/openrouter-backend-client.ts` | Client HTTP vers `/v1/llm/chat` et `/v1/llm/embed` |
 | `optima-ai-backend/` | Nouveau service Fastify |
 
-### Non migré en phase 1
+### Notes
 
-- `generateAIReply` (reste dans `src/lib/agents/business-context/reply.ts` sur Vercel)
-- Pipeline social / émotion / RAG catalogue
-- API route `/api/chat/send` (appelle toujours `generateAIReply` localement, mais OpenRouter via Railway)
+- Cette phase décrivait un **proxy OpenRouter** uniquement.
+- Elle n’est plus l’architecture cible : l’orchestrateur complet tourne maintenant côté Railway.
 
 ## Phase 2 — Orchestrateur complet
 
-- Déplacer `generateAIReply` → `POST /v1/chat/reply`
-- `/api/chat/send` devient un proxy mince (validation + Supabase persist)
-- Redis gère read receipts et délais côté serveur
+- **Objectif atteint** : `generateAIReply` + pipeline complet tournent dans `POST /v1/chat/reply` côté Railway.
+- Le backend Railway est **autonome** (plus de dépendance filesystem au frontend, plus de `OPTIMA_MONOREPO_ROOT`, plus de path scanning hacks).
+- `/api/chat/send` (Vercel) délègue à Railway et ne doit plus exécuter l’orchestration localement en production.
 
 ## Phase 3 — Retrait serverless IA
 
-- Supprimer `OPENROUTER_API_KEY` de Vercel
+- Supprimer `OPENROUTER_API_KEY` de Vercel (optionnel si vous voulez empêcher toute exécution locale)
 - Cron relances / followups appellent Railway
 - Workers timing queue (BullMQ ou Railway cron)
 
 ## Checklist déploiement
 
-- [ ] Railway : déployer `optima-ai-backend`
+- [ ] Railway : déployer le repo backend (service `optima-ai-backend`)
 - [ ] Upstash : créer base Redis, copier URL + token
 - [ ] Vercel : `OPTIMA_AI_BACKEND_URL` + `OPTIMA_AI_BACKEND_SECRET`
 - [ ] Tester `/health` puis un message chat
 - [ ] Vérifier logs `[OPTIMA_AI_BACKEND] openrouter_chat_ok`
+
+## Notes de packaging (prod)
+
+- Backend Railway compile en `dist/` et démarre via `node dist/index.cjs`.
+- Logs de boot attendus :
+  - `[OPTIMA_BACKEND] autonomous_mode=true`
+  - `[OPTIMA_BACKEND] monorepo_dependency=false`

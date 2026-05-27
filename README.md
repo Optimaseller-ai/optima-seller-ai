@@ -46,12 +46,23 @@ Without env vars, the UI remains fully clickable in demo mode, but auth and pers
 - `NEXT_PUBLIC_SITE_URL` (e.g. `https://your-app.vercel.app`) (recommended)
 - `NEXT_PUBLIC_SUPABASE_URL` (optional for demo, required for auth/persistence)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (optional for demo, required for auth/persistence)
-- `OPENROUTER_API_KEY` (optional: enables real AI instead of mock)
-- `OPENROUTER_MODEL` (optional)
+- `OPTIMA_AI_BACKEND_URL` (required for production AI; Railway base URL, no trailing slash)
+- `OPTIMA_AI_BACKEND_SECRET` (required; min 16 chars)
+- `OPENROUTER_API_KEY` (optional; only used when running AI locally or as an emergency fallback)
+- `OPENROUTER_MODEL` (optional; only used for local mode)
 - `OPENROUTER_SITE_URL` (optional)
 - `OPENROUTER_APP_NAME` (optional)
 
 Build command: `npm run build`
+
+## AI backend (Railway)
+
+The real AI brain runs on Railway and exposes:
+- `GET /health`
+- `POST /v1/chat/reply` (full orchestration)
+- `POST /v1/llm/chat` and `POST /v1/llm/embed` (OpenRouter proxy)
+
+Backend production start command: `node dist/index.cjs` (after build).
 
 ## Pages
 

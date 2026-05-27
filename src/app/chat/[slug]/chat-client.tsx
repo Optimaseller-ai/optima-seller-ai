@@ -1648,8 +1648,14 @@ export default function ChatClient({
   }) {
     const cleared = isConversationUiCleared(loadSession(slug) ?? storedSessionRef.current);
     const hasVisible = messagesRef.current.some((m) => !m.typing);
-    if (cleared && !hasVisible) return;
-    if (!isActiveSendRequest(args.sendRequestId)) return;
+    if (cleared && !hasVisible) {
+      console.warn("[CHAT_UI_RENDER_FAILED]", { reason: "emit_blocked_ui_cleared", cleared, hasVisible });
+      return;
+    }
+    if (!isActiveSendRequest(args.sendRequestId)) {
+      console.warn("[CHAT_UI_RENDER_FAILED]", { reason: "emit_blocked_inactive_send", sendRequestId: args.sendRequestId });
+      return;
+    }
     const hourLocal = new Date().getHours();
     for (let i = 0; i < args.bubbles.length; i++) {
       if (!isActiveSendRequest(args.sendRequestId)) return;
@@ -1657,7 +1663,14 @@ export default function ChatClient({
       const ts = new Date().toISOString();
       const assistantId = newMessageId();
       setMessages((prev) => {
-        if (isDuplicateAssistantInThread(prev, bubble)) return prev;
+        if (isDuplicateAssistantInThread(prev, bubble)) {
+          console.warn("[CHAT_UI_RENDER_FAILED]", {
+            reason: "duplicate_assistant_bubble_blocked",
+            bubbleLen: bubble.length,
+            bubblePreview: bubble.slice(0, 160),
+          });
+          return prev;
+        }
         const merged = dedupeThreadMessages(
           prev
             .filter((m) => !m.typing)
@@ -1674,6 +1687,16 @@ export default function ChatClient({
         const typing = prev.filter((m) => m.typing);
         const next = [...merged, ...typing];
         persistFromUi(next);
+        console.log("[CHAT_UI_RENDER_MESSAGES]", {
+          stage: "emitAssistantBubbles_setMessages",
+          prevLen: prev.length,
+          nextLen: next.length,
+          addedId: assistantId,
+          addedRole: "assistant",
+          addedContentLen: bubble.length,
+          requestId: args.sendRequestId,
+          candidate: args.candidate === true,
+        });
         return next;
       });
       playIncomingTick();
@@ -1884,6 +1907,16 @@ export default function ChatClient({
     }
 
     try {
+      console.log("[CHAT_UI_SEND_START]", {
+        agentId,
+        requestId: sendRequestId,
+        hasText: Boolean(message),
+        textLen: message.length,
+        hasImage: Boolean(localImage),
+        messagesLenBefore: messagesRef.current.length,
+        visibleLenBefore: messagesRef.current.filter((m) => !m.typing).length,
+        replyToId: localReplyTo?.id ?? null,
+      });
       console.log("[CHAT] Envoi du message à /api/chat/send...", { message, agentId });
       const startTime = Date.now();
       
@@ -1938,7 +1971,7 @@ export default function ChatClient({
           agent_personality: humanAgent.personality,
           business_name: agentName,
           sales_style: humanAgent.salesStyle,
-	          history: messages
+	          history: messagesRef.current
 	            .filter((m) => !m.typing)
 	            .slice(-12)
 	            .map((m) => ({
@@ -2175,6 +2208,14 @@ export default function ChatClient({
       } catch (parseErr) {
         console.error("[CHAT] Erreur parse JSON", parseErr);
       }
+      console.log("[CHAT_UI_RESPONSE_RECEIVED]", {
+        httpOk: res.ok,
+        status: res.status,
+        dataType: data === null ? "null" : Array.isArray(data) ? "array" : typeof data,
+        dataKeys: data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : null,
+        replyLen: typeof data?.reply === "string" ? data.reply.length : null,
+        request_id: data?.request_id,
+      });
 
       if (progressTimer) {
         window.clearInterval(progressTimer);
@@ -2244,6 +2285,12 @@ export default function ChatClient({
 	      console.log("message reçu", message);
 	      console.log("agent_id", agentId);
 	      console.log("réponse IA", reply);
+        console.log("[CHAT_UI_APPEND_ASSISTANT]", {
+          requestId: sendRequestId,
+          replyLen: reply.length,
+          messagesLenBeforeEmit: messagesRef.current.length,
+          visibleLenBeforeEmit: messagesRef.current.filter((m) => !m.typing).length,
+        });
 
 	      setMessages((prev) => {
 	        const next = prev.map((m) => (m.id === userMessageId ? { ...m, status: "sent" as const } : m));
@@ -2353,6 +2400,30 @@ export default function ChatClient({
   const displayedMessages = query
     ? visibleMessages.filter((m) => String(m.content ?? "").toLowerCase().includes(query))
     : visibleMessages;
+  useEffect(() => {
+    try {
+      const last = displayedMessages[displayedMessages.length - 1];
+      console.log("[CHAT_UI_RENDER_MESSAGES]", {
+        messagesLen: messages.length,
+        visibleLen: visibleMessages.length,
+        displayedLen: displayedMessages.length,
+        queryActive: Boolean(query),
+        query,
+        lastRole: last?.role,
+        lastContentLen: String(last?.content ?? "").length,
+        lastId: last?.id,
+      });
+      if (visibleMessages.length > 0 && displayedMessages.length === 0) {
+        console.warn("[CHAT_UI_RENDER_FAILED]", {
+          reason: "search_filter_hides_messages",
+          query,
+          visibleLen: visibleMessages.length,
+        });
+      }
+    } catch (e) {
+      console.warn("[CHAT_UI_RENDER_FAILED]", { reason: "render_log_exception", e });
+    }
+  }, [messages.length, visibleMessages.length, displayedMessages.length, query]);
   const presenceStatus =
     agentPresencePhase === "writing" || isTyping
       ? "Réponse en préparation"

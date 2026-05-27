@@ -68,6 +68,8 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
   };
 
   if (!resp.ok) {
+    const details = json?.details as { fieldErrors?: Record<string, unknown> } | undefined;
+    const legacyMessagesErr = details?.fieldErrors?.messages;
     console.error("[OPTIMA_PROXY] railway_request_http_error", {
       path,
       status: resp.status,
@@ -77,13 +79,22 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
       missing: json?.missing,
       invalid_type: json?.invalid_type,
       details: json?.details,
+      legacy_messages_field_errors: legacyMessagesErr,
+      hint:
+        Array.isArray(legacyMessagesErr) || legacyMessagesErr != null
+          ? "Railway is likely running an OLD build that required body.messages — redeploy optima-ai-backend with startCommand: node dist/index.js"
+          : undefined,
     });
+    const detailMsg =
+      Array.isArray(legacyMessagesErr) && legacyMessagesErr.length
+        ? ` (${legacyMessagesErr.map(String).join("; ")})`
+        : "";
     const msg =
       typeof json?.message === "string"
-        ? json.message
+        ? json.message + detailMsg
         : typeof json?.error === "string"
-          ? json.error
-          : `Backend HTTP ${resp.status}`;
+          ? json.error + detailMsg
+          : `Backend HTTP ${resp.status}${detailMsg}`;
     const err = new Error(msg) as Error & { status?: number; validationIssues?: unknown };
     err.status = resp.status;
     err.validationIssues = json?.issues ?? json?.details;

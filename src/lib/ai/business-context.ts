@@ -1,1 +1,1 @@
-export { generateAIReply, getBusinessContext } from "@/lib/agents/business-context";
+export { generateAIReply, generateAIReplyUnified, getBusinessContext, type GenerateAIReplyResult } from "@/lib/agents/business-context";

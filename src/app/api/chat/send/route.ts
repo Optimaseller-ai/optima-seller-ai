@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveBusinessTimezone } from "@/lib/ai/businessTimezoneResolver";
 import { detectConversationLanguage, type ConversationLanguage } from "@/lib/ai/language-detection";
-import { generateAIReply } from "@/lib/ai/business-context";
+import { generateAIReplyUnified, type GenerateAIReplyResult } from "@/lib/ai/business-context";
 import { followupDelayMs, isAgentHoldReply } from "@/lib/chat/agent-hold";
 import { resolvePublicPersonaForAgent } from "@/lib/chat/commercial-agents";
 import { detectStatusFromUserMessage, getNextRelanceAt, isClosedStatus } from "@/lib/chat/relance";
@@ -335,7 +335,7 @@ export async function POST(req: Request) {
       personaKey: (agent as { persona_key?: string }).persona_key ?? persona.id,
       kind: "discovery",
     });
-    let gen: Awaited<ReturnType<typeof generateAIReply>> | undefined;
+    let gen: GenerateAIReplyResult & { orchestratorPipelineDebug?: Record<string, unknown> } | undefined;
 
     const takeoverMode = readTakeoverMode(mergedBase);
     if (isAiSilentForTakeover(takeoverMode)) {
@@ -368,7 +368,7 @@ export async function POST(req: Request) {
       });
 
       const genT0 = Date.now();
-      gen = await generateAIReply({
+      gen = await generateAIReplyUnified({
         message,
         userId: agent.user_id,
         agentName: agent_name || persona.name,
@@ -384,6 +384,11 @@ export async function POST(req: Request) {
         agentId: agent_id,
         pipelineDebugger: pipelineDbg,
         replyTurn,
+        railwayMeta: {
+          session_id,
+          request_id: replyTurn.requestId,
+          pipeline_trace_id: pipelineDbg.traceId,
+        },
       });
       if (!isActiveReplyTurn(replyTurn)) {
         console.warn("[OPTIMA_AI_CHAT_SEND] stale_reply_discarded", {
@@ -410,6 +415,32 @@ export async function POST(req: Request) {
       });
     } catch (e) {
       const msg = (e as Error)?.message ?? String(e);
+      if (msg === "RAILWAY_STALE_REPLY_TURN") {
+        console.warn("[OPTIMA_AI_CHAT_SEND] railway_stale_reply_turn", { session_id, requestId: replyTurn.requestId });
+        return NextResponse.json(
+          {
+            success: false,
+            error: "STALE_REQUEST",
+            reply: "",
+            request_id: replyTurn.requestId,
+            discarded: true,
+          },
+          { status: 200 },
+        );
+      }
+      if (msg === "RAILWAY_DUPLICATE_REPLY_REQUEST") {
+        console.warn("[OPTIMA_AI_CHAT_SEND] railway_duplicate_reply", { session_id, requestId: replyTurn.requestId });
+        return NextResponse.json(
+          {
+            success: false,
+            error: "DUPLICATE_REQUEST",
+            reply: "",
+            request_id: replyTurn.requestId,
+            discarded: true,
+          },
+          { status: 200 },
+        );
+      }
       if (msg === "HUMAN_TAKEOVER_SKIP_AI") {
         console.log("[OPTIMA_AI_CHAT_SEND] skipped_ai_human_takeover");
       } else {
@@ -673,6 +704,7 @@ export async function POST(req: Request) {
 
     const pipelineSnapshot = {
       ...pipelineDbg.toSnapshot(),
+      railway_orchestrator_pipeline: gen?.orchestratorPipelineDebug,
       socialOnlyMode: behaviorState.socialOnlyMode?.active === true,
       automationBlockReason: autoEligibility.eligible ? undefined : autoEligibility.blockReason,
       leadClassificationReason: behaviorState.socialOnlyMode?.reason ?? autoEligibility.blockReason,

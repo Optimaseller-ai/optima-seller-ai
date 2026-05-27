@@ -8,6 +8,8 @@ export type OpenRouterProxyMode = "railway" | "local";
 export type OpenRouterProxyConfig = {
   mode: OpenRouterProxyMode;
   backendEnabled: boolean;
+  /** When true, `/api/chat/send` delegates `generateAIReply` to `POST /v1/chat/reply` on Railway. */
+  railwayFullOrchestratorEnabled: boolean;
   backendUrl: string | null;
   hasBackendUrl: boolean;
   hasBackendSecret: boolean;
@@ -34,6 +36,11 @@ function readForceLocal(): boolean {
   return v === "1" || v === "true" || v === "yes";
 }
 
+function readRailwayFullOrchestratorDisabled(): boolean {
+  const v = process.env.OPTIMA_RAILWAY_FULL_ORCHESTRATOR?.trim().toLowerCase();
+  return v === "0" || v === "false" || v === "off" || v === "no";
+}
+
 /** Single source of truth for OpenRouter proxy routing (Vercel → Railway). */
 export function resolveOpenRouterProxyConfig(): OpenRouterProxyConfig {
   const backendUrl = readBackendUrl();
@@ -54,10 +61,12 @@ export function resolveOpenRouterProxyConfig(): OpenRouterProxyConfig {
 
   const backendEnabled = hasBackendUrl && hasBackendSecret && !forceLocal;
   const mode: OpenRouterProxyMode = backendEnabled ? "railway" : "local";
+  const railwayFullOrchestratorEnabled = backendEnabled && !readRailwayFullOrchestratorDisabled();
 
   return {
     mode,
     backendEnabled,
+    railwayFullOrchestratorEnabled,
     backendUrl: backendEnabled ? backendUrl : null,
     hasBackendUrl,
     hasBackendSecret,
@@ -88,6 +97,7 @@ export function logOpenRouterProxyConfigOnce(): OpenRouterProxyConfig {
 
   console.log("[OPTIMA_PROXY] backend_enabled", {
     enabled: cfg.backendEnabled,
+    railwayFullOrchestrator: cfg.railwayFullOrchestratorEnabled,
     hasBackendUrl: cfg.hasBackendUrl,
     hasBackendSecret: cfg.hasBackendSecret,
     secretLength: cfg.secretLength,
@@ -99,7 +109,7 @@ export function logOpenRouterProxyConfigOnce(): OpenRouterProxyConfig {
   if (cfg.backendEnabled) {
     console.log("[OPTIMA_PROXY] using_railway_backend", {
       host: urlHost,
-      paths: ["/v1/llm/chat", "/v1/llm/embed"],
+      paths: ["/v1/llm/chat", "/v1/llm/embed", "/v1/chat/reply"],
     });
   } else {
     console.warn("[OPTIMA_PROXY] fallback_local_openrouter", {
@@ -114,4 +124,8 @@ export function logOpenRouterProxyConfigOnce(): OpenRouterProxyConfig {
 
 export function isOpenRouterDelegatedToBackend(): boolean {
   return resolveOpenRouterProxyConfig().backendEnabled;
+}
+
+export function isRailwayFullOrchestratorEnabled(): boolean {
+  return resolveOpenRouterProxyConfig().railwayFullOrchestratorEnabled;
 }

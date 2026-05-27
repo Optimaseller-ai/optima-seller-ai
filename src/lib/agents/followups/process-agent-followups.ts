@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateAIReply } from "@/lib/agents/business-context/reply";
+import { generateAIReplyUnified } from "@/lib/agents/business-context/generate-ai-reply-unified";
+import { isRailwayFullOrchestratorEnabled } from "@/lib/ai/openrouter-proxy-config";
 import { resolvePublicPersonaForAgent } from "@/lib/chat/agent-identity-manager";
 import { conversationsUpdateWithOptionalColumnFallback, isMissingConversationStateColumn } from "@/lib/chat/conversation-state-db";
 
@@ -53,11 +54,11 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
     try {
       let convRes = await admin
         .from("conversations")
-        .select("id,messages,agent_id,conversation_state")
+        .select("id,messages,agent_id,conversation_state,session_id")
         .eq("id", conversationId)
         .maybeSingle();
       if (convRes.error && isMissingConversationStateColumn(convRes.error)) {
-        convRes = await admin.from("conversations").select("id,messages,agent_id").eq("id", conversationId).maybeSingle();
+        convRes = await admin.from("conversations").select("id,messages,agent_id,session_id").eq("id", conversationId).maybeSingle();
       }
       const conv = convRes.data;
       const cErr = convRes.error;
@@ -109,9 +110,13 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
         language: payload.lang === "en" || payload.lang === "es" || payload.lang === "fr" ? payload.lang : (fromPayload as any).language ?? (fromDb as any).language ?? "fr",
       } as any;
 
+      const sessionIdForOrchestrator = String((conv as any).session_id ?? conversationId).trim() || String(conversationId);
+      const followupReqId = `followup_${id}_${Date.now()}`;
+      const followupTraceId = `followup_${conversationId}_${Date.now()}`;
+
       let followupText = "";
       try {
-        const gen = await generateAIReply({
+        const gen = await generateAIReplyUnified({
           message: lastUser,
           userId: (agentRow as any).user_id,
           agentName: persona.name,
@@ -124,6 +129,13 @@ export async function processDueAgentFollowups(opts: { max?: number } = {}) {
           followupAfterHold: true,
           conversationState: mergedBehaviorState,
           personaKey: payload.personaKey ?? (agentRow as any).persona_key ?? persona.id,
+          railwayMeta: isRailwayFullOrchestratorEnabled()
+            ? {
+                session_id: sessionIdForOrchestrator,
+                request_id: followupReqId,
+                pipeline_trace_id: followupTraceId,
+              }
+            : undefined,
         });
         followupText = gen.reply;
       } catch (e) {

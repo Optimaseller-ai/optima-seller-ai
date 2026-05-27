@@ -6,7 +6,7 @@ import {
   resolveOpenRouterProxyConfig,
 } from "./openrouter-proxy-config";
 
-async function postBackend<T>(path: string, body: unknown): Promise<T> {
+export async function postOptimaAiBackend<T>(path: string, body: unknown): Promise<T> {
   const cfg = logOpenRouterProxyConfigOnce();
   if (!cfg.backendEnabled || !cfg.backendUrl) {
     throw new Error(
@@ -88,7 +88,7 @@ export async function openRouterChatViaBackend(args: {
   timeoutMs?: number;
   maxTokens?: number;
 }): Promise<string> {
-  const data = await postBackend<{ ok: boolean; content: string }>("/v1/llm/chat", {
+  const data = await postOptimaAiBackend<{ ok: boolean; content: string }>("/v1/llm/chat", {
     model: args.model,
     messages: args.messages,
     max_tokens: args.maxTokens,
@@ -107,7 +107,7 @@ export async function openRouterEmbedViaBackend(args: {
   input: string;
   timeoutMs?: number;
 }): Promise<number[]> {
-  const data = await postBackend<{ ok: boolean; embedding: number[] }>("/v1/llm/embed", {
+  const data = await postOptimaAiBackend<{ ok: boolean; embedding: number[] }>("/v1/llm/embed", {
     model: args.model,
     input: args.input,
     timeout_ms: args.timeoutMs,

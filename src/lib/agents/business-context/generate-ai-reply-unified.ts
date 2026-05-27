@@ -4,12 +4,14 @@ import type { GenerateAIReplyResult } from "@/lib/agents/business-context/reply"
 import { generateAIReply } from "@/lib/agents/business-context/reply";
 import { postOptimaAiBackend } from "@/lib/ai/openrouter-backend-client";
 import { isRailwayFullOrchestratorEnabled } from "@/lib/ai/openrouter-proxy-config";
+import {
+  buildRailwayChatReplyPayload,
+  describeRailwayPayloadForLog,
+  safeJsonStringifyForLog,
+  type GenerateAIReplyRailwayMeta,
+} from "@/lib/ai/railway-chat-reply-payload";
 
-export type GenerateAIReplyRailwayMeta = {
-  session_id: string;
-  request_id: string;
-  pipeline_trace_id: string;
-};
+export type { GenerateAIReplyRailwayMeta };
 
 export type GenerateAIReplyUnifiedArgs = Parameters<typeof generateAIReply>[0] & {
   railwayMeta?: GenerateAIReplyRailwayMeta;
@@ -54,38 +56,44 @@ export async function generateAIReplyUnified(
     if (!railwayMeta) {
       throw new Error("[OPTIMA_REPLY_PIPELINE] railway_full_orchestrator_enabled_missing_railwayMeta");
     }
-    console.log("[OPTIMA_REPLY_PIPELINE] delegating_to_railway", {
-      session_id: railwayMeta.session_id,
-      request_id: railwayMeta.request_id,
+
+    const railwayPayload = buildRailwayChatReplyPayload({
+      railwayMeta,
+      message: localArgs.message,
+      userId: localArgs.userId,
+      agentId: localArgs.agentId,
+      agentName: localArgs.agentName,
+      agentPersonality: localArgs.agentPersonality,
+      salesStyle: localArgs.salesStyle,
+      businessName: localArgs.businessName,
+      conversationState: localArgs.conversationState,
+      history: localArgs.history,
+      agentRole: localArgs.agentRole,
+      agentTone: localArgs.agentTone,
+      personaKey: localArgs.personaKey ?? null,
+      followupAfterHold: localArgs.followupAfterHold,
     });
+
+    console.log("[OPTIMA_REPLY_PIPELINE] delegating_to_railway", describeRailwayPayloadForLog(railwayPayload));
+    console.log("[OPTIMA_REPLY_PIPELINE] outgoing_body_json", safeJsonStringifyForLog(railwayPayload));
+
     try {
-      const data = await postOptimaAiBackend<Record<string, unknown>>("/v1/chat/reply", {
-        session_id: railwayMeta.session_id,
-        request_id: railwayMeta.request_id,
-        pipeline_trace_id: railwayMeta.pipeline_trace_id,
-        message: localArgs.message,
-        user_id: localArgs.userId,
-        agent_id: localArgs.agentId,
-        agent_name: localArgs.agentName,
-        agent_personality: localArgs.agentPersonality,
-        sales_style: localArgs.salesStyle,
-        business_name: localArgs.businessName,
-        conversation_state: localArgs.conversationState,
-        history: localArgs.history,
-        agent_role: localArgs.agentRole,
-        agent_tone: localArgs.agentTone,
-        persona_key: localArgs.personaKey ?? null,
-        followup_after_hold: localArgs.followupAfterHold,
-      });
+      const data = await postOptimaAiBackend<Record<string, unknown>>("/v1/chat/reply", railwayPayload);
       return mapRailwayResponse(data);
     } catch (e) {
-      const err = e as Error & { status?: number };
+      const err = e as Error & { status?: number; validationIssues?: unknown };
       const em = String(err.message ?? "");
       if (err.status === 409 && (em.includes("duplicate") || em === "duplicate_request")) {
         throw new Error("RAILWAY_DUPLICATE_REPLY_REQUEST");
       }
       if (err.status === 409 && (em.includes("stale") || em === "stale_reply_turn")) {
         throw new Error("RAILWAY_STALE_REPLY_TURN");
+      }
+      if (err.status === 400) {
+        console.error("[OPTIMA_REPLY_PIPELINE] railway_invalid_body", {
+          message: em,
+          issues: err.validationIssues,
+        });
       }
       throw e;
     }

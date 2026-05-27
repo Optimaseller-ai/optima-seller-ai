@@ -21,9 +21,11 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
 
   const url = `${cfg.backendUrl}${path}`;
   const started = Date.now();
+  const bodyJson = JSON.stringify(body);
 
   console.log("[OPTIMA_PROXY] railway_request_start", {
     path,
+    bodyBytes: bodyJson.length,
     host: (() => {
       try {
         return new URL(cfg.backendUrl!).host;
@@ -33,6 +35,10 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
     })(),
   });
 
+  if (path === "/v1/chat/reply") {
+    console.log("[OPTIMA_PROXY] outgoing_body_json", bodyJson.length > 24_000 ? `${bodyJson.slice(0, 24_000)}…` : bodyJson);
+  }
+
   let resp: Response;
   try {
     resp = await fetch(url, {
@@ -41,7 +47,7 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
         Authorization: `Bearer ${secret}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(body),
+      body: bodyJson,
     });
   } catch (err) {
     console.error("[OPTIMA_PROXY] railway_request_network_error", {
@@ -52,7 +58,14 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
     throw err;
   }
 
-  const json = (await resp.json().catch(() => ({}))) as T & { error?: string; message?: string };
+  const json = (await resp.json().catch(() => ({}))) as T & {
+    error?: string;
+    message?: string;
+    issues?: unknown;
+    missing?: unknown;
+    invalid_type?: unknown;
+    details?: unknown;
+  };
 
   if (!resp.ok) {
     console.error("[OPTIMA_PROXY] railway_request_http_error", {
@@ -60,6 +73,10 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
       status: resp.status,
       durationMs: Date.now() - started,
       error: json?.error ?? json?.message,
+      issues: json?.issues,
+      missing: json?.missing,
+      invalid_type: json?.invalid_type,
+      details: json?.details,
     });
     const msg =
       typeof json?.message === "string"
@@ -67,8 +84,9 @@ export async function postOptimaAiBackend<T>(path: string, body: unknown): Promi
         : typeof json?.error === "string"
           ? json.error
           : `Backend HTTP ${resp.status}`;
-    const err = new Error(msg) as Error & { status?: number };
+    const err = new Error(msg) as Error & { status?: number; validationIssues?: unknown };
     err.status = resp.status;
+    err.validationIssues = json?.issues ?? json?.details;
     throw err;
   }
 

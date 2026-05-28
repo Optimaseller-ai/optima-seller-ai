@@ -78,9 +78,7 @@ import {
 } from "@/lib/agents/human-behavior/coherence/message-deduplication-guard";
 import { messageRequiresMainReplyPipeline } from "@/lib/chat/pipeline/central-reply-manager";
 import {
-  assistantContentKey,
   dedupeThreadMessages,
-  isDuplicateAssistantInThread,
 } from "@/lib/chat/dedupe-thread-messages";
 
 type StoredMessage = {
@@ -1208,22 +1206,15 @@ export default function ChatClient({
           if (isConversationUiCleared(loadSession(slug) ?? storedSessionRef.current)) return prev;
           let next = prev;
           const existingIds = new Set(prev.map((m) => m.id));
-          const existingAssistantContent = new Set(
-            prev
-              .filter((m) => m.role === "assistant" && !m.typing)
-              .map((m) => assistantContentKey(String(m.content ?? ""))),
-          );
           for (const sm of toAdd) {
             const content = String(sm.content ?? "").trim();
-            if (sm.role === "assistant") {
-              const ck = assistantContentKey(content);
-              if (ck && existingAssistantContent.has(ck)) continue;
-              if (ck) existingAssistantContent.add(ck);
-            }
-            const fp = `${sm.role}\0${sm.ts}\0${content}`;
             const id = sm.id?.trim() || newMessageId();
             if (existingIds.has(id)) continue;
             existingIds.add(id);
+            const alreadySame = next.some(
+              (m) => !m.typing && m.role === "assistant" && m.ts === sm.ts && String(m.content ?? "").trim() === content,
+            );
+            if (alreadySame) continue;
             next = next.concat({
               id,
               role: "assistant",
@@ -1232,7 +1223,9 @@ export default function ChatClient({
               animateIn: "left",
             });
           }
-          next = dedupeThreadMessages(next.filter((m) => !m.typing)) as UiMessage[];
+          // Keep legitimate repeated assistant replies across turns.
+          // Only strip typing placeholders before merge.
+          next = next.filter((m) => !m.typing) as UiMessage[];
           const typing = prev.filter((m) => m.typing);
           next = [...next, ...typing];
           persistFromUi(next);
@@ -1665,27 +1658,23 @@ export default function ChatClient({
       const assistantId = newMessageId();
       setMessages((prev) => {
         console.log("[MESSAGES_BEFORE]", prev);
-        if (isDuplicateAssistantInThread(prev, bubble)) {
-          console.warn("[CHAT_UI_RENDER_FAILED]", {
-            reason: "duplicate_assistant_bubble_blocked",
-            bubbleLen: bubble.length,
-            bubblePreview: bubble.slice(0, 160),
-          });
-          return prev;
-        }
-        const merged = dedupeThreadMessages(
-          prev
-            .filter((m) => !m.typing)
-            .concat({
-              id: assistantId,
-              role: "assistant",
-              content: bubble,
-              ts,
-              animateIn: "left",
-              request_id: args.sendRequestId,
-              candidate: args.candidate === true,
-            }),
-        ) as UiMessage[];
+        const base = prev.filter((m) => !m.typing);
+        const sameRequestSameBubble = base.some(
+          (m) =>
+            m.role === "assistant" &&
+            m.request_id === args.sendRequestId &&
+            String(m.content ?? "").trim() === String(bubble ?? "").trim(),
+        );
+        if (sameRequestSameBubble) return prev;
+        const merged = base.concat({
+          id: assistantId,
+          role: "assistant",
+          content: bubble,
+          ts,
+          animateIn: "left",
+          request_id: args.sendRequestId,
+          candidate: args.candidate === true,
+        }) as UiMessage[];
         const typing = prev.filter((m) => m.typing);
         const next = [...merged, ...typing];
         persistFromUi(next);

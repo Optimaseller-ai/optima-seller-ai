@@ -2462,8 +2462,23 @@ export default function ChatClient({
     sendAbortRef.current?.abort();
     sendAbortRef.current = null;
     inFlightRef.current = false;
-    mediaRecorderRef.current?.stop();
-    voiceStreamRef.current?.getTracks().forEach((t) => t.stop());
+    try {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+    } catch (e) {
+      console.warn("[CHAT_UI_RENDER_FAILED]", { reason: "clear_stop_recorder_failed", e });
+    }
+    try {
+      voiceStreamRef.current?.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {
+          // ignore per-track stop failures
+        }
+      });
+    } catch (e) {
+      console.warn("[CHAT_UI_RENDER_FAILED]", { reason: "clear_stop_voice_stream_failed", e });
+    }
     voiceStreamRef.current = null;
     setRecordingVoice(false);
     setSending(false);

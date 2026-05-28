@@ -38,11 +38,11 @@ export function ChatEmptyState(props: ChatEmptyStateProps) {
       {props.clearedByUser ? (
         <>
           <p className={`text-[18px] font-semibold tracking-tight ${props.darkMode ? "text-slate-100" : "text-slate-900"}`}>
-            Nouvelle conversation
+            Conversation effacee
           </p>
           <p className={`mx-auto mt-2 max-w-sm text-sm leading-relaxed ${props.darkMode ? "text-slate-400" : "text-slate-600"}`}>
-            Votre historique n&apos;est plus visible ici. {props.agentName} conserve le contexte utile pour mieux vous
-            répondre.
+            L&apos;historique n&apos;est plus visible ici. {props.agentName} reste actif et conserve le contexte utile pour mieux vous
+            repondre.
           </p>
           <button
             type="button"

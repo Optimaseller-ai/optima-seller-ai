@@ -36,11 +36,10 @@ export function ChatClearModal(props: ChatClearModalProps) {
             }`}
           >
             <h2 id="clear-chat-title" className="text-[17px] font-semibold tracking-tight">
-              Effacer cette conversation ?
+              Effacer la conversation pour vous ?
             </h2>
             <p className={`mt-3 text-[14px] leading-relaxed ${props.darkMode ? "text-slate-400" : "text-slate-600"}`}>
-              Les messages seront supprimés de votre écran, mais l&apos;agent conservera certaines informations afin de
-              mieux vous répondre.
+              Les messages seront masques uniquement dans cette interface. La session et la memoire de l&apos;agent restent actives.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button

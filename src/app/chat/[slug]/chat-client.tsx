@@ -686,6 +686,7 @@ export default function ChatClient({
   const [backgroundMode, setBackgroundMode] = useState<"mesh" | "blur" | "noise" | "paper">("noise");
   const [imageZoomUrl, setImageZoomUrl] = useState<string | null>(null);
   const [showClearModal, setShowClearModal] = useState(false);
+  const [isClearingUi, setIsClearingUi] = useState(false);
   const lastAssistantCountRef = useRef(0);
   const [conversationPreviews, setConversationPreviews] = useState<ConversationPreview[]>([]);
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
@@ -2401,6 +2402,12 @@ export default function ChatClient({
     ? visibleMessages.filter((m) => String(m.content ?? "").toLowerCase().includes(query))
     : visibleMessages;
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (visibleMessages.length > 0) {
+      window.localStorage.setItem("optima_chat_hidden_history", "false");
+    }
+  }, [visibleMessages.length]);
+  useEffect(() => {
     try {
       const last = displayedMessages[displayedMessages.length - 1];
       console.log("[CHAT_UI_RENDER_MESSAGES]", {
@@ -2449,17 +2456,40 @@ export default function ChatClient({
   };
 
   const clearConversationUi = () => {
+    if (isClearingUi) return;
+    setIsClearingUi(true);
     syncSuppressUntilRef.current = Date.now() + 86_400_000;
     sendAbortRef.current?.abort();
     sendAbortRef.current = null;
     inFlightRef.current = false;
+    mediaRecorderRef.current?.stop();
+    voiceStreamRef.current?.getTracks().forEach((t) => t.stop());
+    voiceStreamRef.current = null;
+    setRecordingVoice(false);
     setSending(false);
     setAgentPresencePhase("default");
     setReadReceiptMessageId(null);
+    setPendingImage(null);
+    setPendingImageName("");
+    setImageSendProgress(0);
+    setReplyTo(null);
+    setSelectedMessageId(null);
+    setSearch("");
+    setInput("");
+    setUnseenCount(0);
+    setUnreadMap((prev) => ({ ...prev, [slug]: 0 }));
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("optima_chat_hidden_history", "true");
+    }
+    if (fileRef.current) fileRef.current.value = "";
 
     const sess = loadSession(slug) ?? storedSessionRef.current;
     if (!sess) {
-      setMessages([]);
+      window.setTimeout(() => {
+        setMessages([]);
+        setShowClearModal(false);
+        setIsClearingUi(false);
+      }, 220);
       setShowClearModal(false);
       return;
     }
@@ -2468,12 +2498,12 @@ export default function ChatClient({
     saveSession(slug, next);
     storedSessionRef.current = next;
     setLocalSessionTick((x) => x + 1);
-    setMessages([]);
-    setReplyTo(null);
-    setSelectedMessageId(null);
-    setUnseenCount(0);
-    setShowClearModal(false);
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+    window.setTimeout(() => {
+      setMessages([]);
+      setShowClearModal(false);
+      setIsClearingUi(false);
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    }, 220);
   };
 
   const exportConversationText = () => {
@@ -2588,7 +2618,12 @@ export default function ChatClient({
                   darkMode ? "text-slate-100" : "text-slate-900"
                 }`}
               >
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }} className="relative z-[1] flex w-full flex-col gap-5 pb-28 min-[480px]:pb-12 lg:pb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: isClearingUi ? 0 : 1, y: isClearingUi ? 4 : 0, filter: isClearingUi ? "blur(1px)" : "blur(0px)" }}
+              transition={{ duration: isClearingUi ? 0.2 : 0.32, ease: [0.22, 1, 0.36, 1] }}
+              className="relative z-[1] flex w-full flex-col gap-5 pb-28 min-[480px]:pb-12 lg:pb-8"
+            >
               {visibleMessages.length === 0 && agentId && !initError ? (
                 <ChatEmptyState
                   darkMode={darkMode}

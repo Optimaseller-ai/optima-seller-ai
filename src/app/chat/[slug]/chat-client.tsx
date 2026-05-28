@@ -1664,6 +1664,7 @@ export default function ChatClient({
       const ts = new Date().toISOString();
       const assistantId = newMessageId();
       setMessages((prev) => {
+        console.log("[MESSAGES_BEFORE]", prev);
         if (isDuplicateAssistantInThread(prev, bubble)) {
           console.warn("[CHAT_UI_RENDER_FAILED]", {
             reason: "duplicate_assistant_bubble_blocked",
@@ -1688,6 +1689,7 @@ export default function ChatClient({
         const typing = prev.filter((m) => m.typing);
         const next = [...merged, ...typing];
         persistFromUi(next);
+        console.log("[MESSAGES_AFTER]", next);
         console.log("[CHAT_UI_RENDER_MESSAGES]", {
           stage: "emitAssistantBubbles_setMessages",
           prevLen: prev.length,
@@ -2209,6 +2211,7 @@ export default function ChatClient({
       } catch (parseErr) {
         console.error("[CHAT] Erreur parse JSON", parseErr);
       }
+      console.log("[API_RESPONSE]", data);
       console.log("[CHAT_UI_RESPONSE_RECEIVED]", {
         httpOk: res.ok,
         status: res.status,
@@ -2238,12 +2241,20 @@ export default function ChatClient({
         console.warn("[CHAT] Réponse ignorée — tour périmé (requestId)", { sendRequestId });
         return;
       }
-      if (data?.discarded === true || (data?.request_id && data.request_id !== sendRequestId)) {
+      if (data?.discarded === true) {
         console.warn("[CHAT] Réponse ignorée — request_id stale", {
           expected: sendRequestId,
           got: data?.request_id,
         });
         return;
+      }
+      if (data?.request_id && data.request_id !== sendRequestId) {
+        // Backend can return a different request_id while still returning a valid reply.
+        // Do not drop a good assistant message solely on this mismatch.
+        console.warn("[CHAT] request_id mismatch (response kept)", {
+          expected: sendRequestId,
+          got: data?.request_id,
+        });
       }
       if (typeof data?.user_message === "string" && data.user_message.trim() !== message.trim()) {
         console.warn("[CHAT] Réponse ignorée — user_message mismatch");
@@ -2286,6 +2297,7 @@ export default function ChatClient({
 	      console.log("message reçu", message);
 	      console.log("agent_id", agentId);
 	      console.log("réponse IA", reply);
+        console.log("[ASSISTANT_REPLY]", reply);
         console.log("[CHAT_UI_APPEND_ASSISTANT]", {
           requestId: sendRequestId,
           replyLen: reply.length,
@@ -2317,8 +2329,10 @@ export default function ChatClient({
       window.requestAnimationFrame(() => scrollThreadToBottom("smooth"));
 
       setMessages((prev) => {
+        console.log("[MESSAGES_BEFORE]", prev);
         const stripped = prev.filter((m) => !(m.candidate && m.request_id === sendRequestId));
         persistFromUi(stripped);
+        console.log("[MESSAGES_AFTER]", stripped);
         return stripped;
       });
 

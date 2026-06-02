@@ -15,7 +15,7 @@ type PlaybackCallbacks = {
   onCompleted?: (event: HumanDeliverySocketEvent) => void;
 };
 
-type TimerRef = ReturnType<typeof window.setTimeout>;
+type TimerRef = ReturnType<typeof setTimeout>;
 
 export class HumanPlaybackScheduler {
   private queue: HumanDeliverySocketEvent[] = [];
@@ -146,7 +146,7 @@ export class HumanPlaybackScheduler {
         return;
       }
       const delay = Math.max(0, Number(event.delayMs ?? 0));
-      const timer = window.setTimeout(() => {
+      const timer = setTimeout(() => {
         this.timerRegistry.delete(timer);
         humanDeliveryStoreActions().setPatch({ timers: this.timerRegistry.size });
         this.execute(event);
@@ -190,7 +190,7 @@ export class HumanPlaybackScheduler {
   }
 
   private clearTimers() {
-    for (const t of this.timerRegistry) window.clearTimeout(t);
+    for (const t of this.timerRegistry) clearTimeout(t);
     this.timerRegistry.clear();
     this.activeTimer = null;
   }

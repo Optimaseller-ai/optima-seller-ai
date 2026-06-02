@@ -18,6 +18,8 @@ import { ChatInsightsPanel } from "./chat-insights-panel";
 import { ChatSidebar } from "./chat-sidebar";
 import { MessageBubble } from "./message-bubble";
 import { TypingIndicator } from "./typing-indicator";
+import { TypingBubble } from "./typing-bubble";
+import { ChatSeenIndicator } from "./chat-seen-indicator";
 import {
   COMMERCIAL_AGENTS,
   getCommercialAgentById,
@@ -80,6 +82,13 @@ import { messageRequiresMainReplyPipeline } from "@/lib/chat/pipeline/central-re
 import {
   dedupeThreadMessages,
 } from "@/lib/chat/dedupe-thread-messages";
+import { smartAutoScroll } from "@/lib/chat-ui/smart-auto-scroll";
+import { HumanPlaybackScheduler } from "@/lib/chat-ui/human-playback-scheduler";
+import {
+  type HumanDeliverySocketEvent,
+  rehydrateDeliveryState,
+  useHumanDeliveryStore,
+} from "@/lib/chat-ui/use-human-delivery-store";
 
 type StoredMessage = {
   /** Stable React key — persisted to avoid hash collisions on reload/sync. */
@@ -689,8 +698,10 @@ export default function ChatClient({
   const [conversationPreviews, setConversationPreviews] = useState<ConversationPreview[]>([]);
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
   const [soundsOn, setSoundsOn] = useState(false);
+  const deliveryState = useHumanDeliveryStore();
   const listRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const playbackSchedulerRef = useRef<HumanPlaybackScheduler | null>(null);
   const scrollThreadToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = listRef.current;
     if (!el) return;
@@ -723,6 +734,76 @@ export default function ChatClient({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+  useEffect(() => {
+    rehydrateDeliveryState();
+  }, []);
+  const appendAssistantFragment = useCallback((content: string) => {
+    const clean = String(content ?? "").trim();
+    if (!clean) return;
+    const assistantId = newMessageId();
+    setMessages((prev) => {
+      const next = prev
+        .filter((m) => !m.typing)
+        .concat({
+          id: assistantId,
+          role: "assistant",
+          content: clean,
+          ts: new Date().toISOString(),
+          animateIn: "left" as const,
+        });
+      persistFromUi(next);
+      return next;
+    });
+    const autoScrolled = smartAutoScroll({ container: listRef.current });
+    if (!autoScrolled) setUnseenCount((n) => n + 1);
+  }, []);
+  useEffect(() => {
+    if (playbackSchedulerRef.current) return;
+    playbackSchedulerRef.current = new HumanPlaybackScheduler({
+      onSeen: () => setAgentPresencePhase("seen"),
+      onTypingStart: () => setAgentPresencePhase("writing"),
+      onTypingStop: () => setAgentPresencePhase("online"),
+      onFragment: (event) => appendAssistantFragment(String(event.content ?? "")),
+      onCancelled: () => setAgentPresencePhase("default"),
+      onCompleted: () => setAgentPresencePhase("default"),
+    });
+  }, [appendAssistantFragment]);
+  useEffect(() => {
+    const scheduler = playbackSchedulerRef.current;
+    if (!scheduler) return;
+    const onVisibility = () => {
+      if (document.hidden) scheduler.pausePlayback();
+      else scheduler.resumePlayback();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      scheduler.cancelPlayback({ event: "delivery_cancelled" });
+    };
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onSocketEvent = (ev: Event) => {
+      const custom = ev as CustomEvent<HumanDeliverySocketEvent>;
+      const payload = custom.detail;
+      if (!payload || typeof payload !== "object") return;
+      if (payload.sessionId && payload.sessionId !== sessionId) return;
+      if (!playbackSchedulerRef.current) return;
+      playbackSchedulerRef.current.receiveSocketEvent(payload);
+    };
+    window.addEventListener("optima:socket-event", onSocketEvent as EventListener);
+    return () => window.removeEventListener("optima:socket-event", onSocketEvent as EventListener);
+  }, [sessionId]);
+  useEffect(() => {
+    (window as any).OPTIMA_PLAYBACK_DEBUG = {
+      getState: () => deliveryState,
+      queue: deliveryState.playbackQueue,
+      isTyping: deliveryState.isTyping,
+      currentPlayback: deliveryState.currentPlayback,
+      lastDeliveryEvent: deliveryState.lastDeliveryEvent,
+      timers: deliveryState.timers,
+    };
+  }, [deliveryState]);
   const humanAgent = useMemo(
     () =>
       storedSession
@@ -2395,6 +2476,7 @@ export default function ChatClient({
   );
 
   const isTyping = messages.some((m) => m.typing);
+  const backendTyping = deliveryState.isTyping && deliveryState.currentPlayback !== "cancelled";
   const visibleMessages = useMemo(() => {
     const nonTyping = messages.filter((m) => !m.typing);
     if (uiCleared && nonTyping.length === 0) return [];
@@ -2794,16 +2876,26 @@ export default function ChatClient({
                   </div>
                 );
               })}
-              {!uiCleared && (isTyping || agentPresencePhase === "thinking") ? (
-                <TypingIndicator
-                  name={humanAgent.name}
-                  avatarUrl={agentAvatarUrl}
-                  avatarOk={avatarOk}
-                  initials={initials(humanAgent.name)}
-                  phase={agentPresencePhase === "writing" || isTyping ? "writing" : "thinking"}
-                  subtitle={presenceDetail || undefined}
-                  darkMode={darkMode}
-                />
+              {deliveryState.seenState !== "online" ? (
+                <ChatSeenIndicator state={deliveryState.seenState} darkMode={darkMode} />
+              ) : null}
+              {!uiCleared && (isTyping || agentPresencePhase === "thinking" || backendTyping) ? (
+                backendTyping ? (
+                  <div className="flex items-end gap-2">
+                    <div className="h-7 w-7 shrink-0" />
+                    <TypingBubble darkMode={darkMode} />
+                  </div>
+                ) : (
+                  <TypingIndicator
+                    name={humanAgent.name}
+                    avatarUrl={agentAvatarUrl}
+                    avatarOk={avatarOk}
+                    initials={initials(humanAgent.name)}
+                    phase={agentPresencePhase === "writing" || isTyping ? "writing" : "thinking"}
+                    subtitle={presenceDetail || undefined}
+                    darkMode={darkMode}
+                  />
+                )
               ) : null}
               <div ref={bottomRef} />
             </motion.div>

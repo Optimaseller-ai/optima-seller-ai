@@ -85,10 +85,10 @@ import {
 import { smartAutoScroll } from "@/lib/chat-ui/smart-auto-scroll";
 import { HumanPlaybackScheduler } from "@/lib/chat-ui/human-playback-scheduler";
 import {
-  type HumanDeliverySocketEvent,
   rehydrateDeliveryState,
   useHumanDeliveryStore,
 } from "@/lib/chat-ui/use-human-delivery-store";
+import { RealtimePlaybackManager } from "@/lib/chat-ui/realtime-playback-manager";
 
 type StoredMessage = {
   /** Stable React key — persisted to avoid hash collisions on reload/sync. */
@@ -702,6 +702,7 @@ export default function ChatClient({
   const listRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const playbackSchedulerRef = useRef<HumanPlaybackScheduler | null>(null);
+  const realtimeManagerRef = useRef<RealtimePlaybackManager | null>(null);
   const scrollThreadToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = listRef.current;
     if (!el) return;
@@ -782,17 +783,21 @@ export default function ChatClient({
     };
   }, []);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onSocketEvent = (ev: Event) => {
-      const custom = ev as CustomEvent<HumanDeliverySocketEvent>;
-      const payload = custom.detail;
-      if (!payload || typeof payload !== "object") return;
-      if (payload.sessionId && payload.sessionId !== sessionId) return;
-      if (!playbackSchedulerRef.current) return;
-      playbackSchedulerRef.current.receiveSocketEvent(payload);
+    if (!sessionId) return;
+    if (!playbackSchedulerRef.current) return;
+    if (realtimeManagerRef.current) return;
+    realtimeManagerRef.current = new RealtimePlaybackManager({
+      sessionId,
+      onEvent: (ev) => {
+        // Delivery scheduler is the single source of truth for timings and human playback.
+        playbackSchedulerRef.current?.receiveSocketEvent(ev);
+      },
+    });
+    realtimeManagerRef.current.start();
+    return () => {
+      realtimeManagerRef.current?.stop();
+      realtimeManagerRef.current = null;
     };
-    window.addEventListener("optima:socket-event", onSocketEvent as EventListener);
-    return () => window.removeEventListener("optima:socket-event", onSocketEvent as EventListener);
   }, [sessionId]);
   useEffect(() => {
     (window as any).OPTIMA_PLAYBACK_DEBUG = {

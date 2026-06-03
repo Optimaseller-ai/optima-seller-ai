@@ -89,7 +89,11 @@ import {
   useHumanDeliveryStore,
 } from "@/lib/chat-ui/use-human-delivery-store";
 import { RealtimePlaybackManager } from "@/lib/chat-ui/realtime-playback-manager";
-import { getDoualaTimeGreeting, sanitizePayloadHistory } from "@/lib/chat-ui/payload-history";
+import {
+  buildFrontendIntroLine,
+  sanitizePayloadHistory,
+  stripLegacyIntroSeedsFromMessages,
+} from "@/lib/chat-ui/payload-history";
 
 type StoredMessage = {
   /** Stable React key — persisted to avoid hash collisions on reload/sync. */
@@ -951,7 +955,11 @@ export default function ChatClient({
     const slugChanged = lastHydratedSlugRef.current !== slug;
     lastHydratedSlugRef.current = slug;
 
-    const diskMsgs = storedSession.messages;
+    const purged = stripLegacyIntroSeedsFromMessages(storedSession.messages);
+    if (purged.removed > 0) {
+      saveSession(slug, { ...storedSession, messages: purged.messages as StoredMessage[] });
+    }
+    const diskMsgs = purged.messages as StoredMessage[];
     const diskCount = diskMsgs.length;
     const localCount = messagesRef.current.filter((m) => !m.typing).length;
 
@@ -1105,7 +1113,10 @@ export default function ChatClient({
     if (messagesRef.current.some((m) => !m.typing && m.role === "user")) return;
 
     transientWelcomeShownRef.current = true;
-    const greeting = getDoualaTimeGreeting();
+    const greeting = buildFrontendIntroLine({
+      businessName: sanitizeUiLabel(agentName),
+      agentName: humanAgent.name,
+    });
     const welcomeId = `transient_welcome_${crypto.randomUUID()}`;
     console.log("[FRONTEND_HISTORY_INIT]", { persistedMessages: 0, transientWelcome: true });
     console.log("[TRANSIENT_MESSAGE_CREATED]", { id: welcomeId, content: greeting });
@@ -1125,7 +1136,7 @@ export default function ChatClient({
       ];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, storedSession]);
+  }, [mounted, storedSession, agentName, humanAgent.name]);
 
   useEffect(() => {
     return () => {

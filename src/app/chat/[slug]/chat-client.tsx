@@ -89,6 +89,7 @@ import {
   useHumanDeliveryStore,
 } from "@/lib/chat-ui/use-human-delivery-store";
 import { RealtimePlaybackManager } from "@/lib/chat-ui/realtime-playback-manager";
+import { getDoualaTimeGreeting, sanitizePayloadHistory } from "@/lib/chat-ui/payload-history";
 
 type StoredMessage = {
   /** Stable React key — persisted to avoid hash collisions on reload/sync. */
@@ -115,6 +116,8 @@ type UiMessage = StoredMessage & {
   request_id?: string;
   /** Micro-bulle client (interlude) — retirée avant la réponse finale du même tour. */
   candidate?: boolean;
+  /** UI-only preview — never persisted or sent to backend history. */
+  transient?: boolean;
 };
 
 type HumanAgentPersonality = "chaleureux" | "professionnel" | "dynamique";
@@ -1093,39 +1096,34 @@ export default function ChatClient({
     }
   }
 
+  const transientWelcomeShownRef = useRef(false);
   useEffect(() => {
     if (!mounted || !storedSession) return;
     if (isConversationUiCleared(storedSession)) return;
-    const state = storedSession.conversation_state ?? {};
-    const introDone = Boolean((state as any).intro_done);
-    if (introDone) return;
     if (storedSession.messages.length > 0) return;
+    if (transientWelcomeShownRef.current) return;
+    if (messagesRef.current.some((m) => !m.typing && m.role === "user")) return;
 
-    (async () => {
-      try {
-        // Mark intro as done immediately to avoid double-firing on refresh.
-        const nextState = { ...(state as any), intro_done: true, stats: { ...(state as any).stats, last_active_at: Date.now() } };
-        const baseIntro = loadSession(slug) ?? storedSession;
-        saveSession(slug, { ...baseIntro, conversation_state: nextState });
+    transientWelcomeShownRef.current = true;
+    const greeting = getDoualaTimeGreeting();
+    const welcomeId = `transient_welcome_${crypto.randomUUID()}`;
+    console.log("[FRONTEND_HISTORY_INIT]", { persistedMessages: 0, transientWelcome: true });
+    console.log("[TRANSIENT_MESSAGE_CREATED]", { id: welcomeId, content: greeting });
 
-        await sleep(700 + Math.round(Math.random() * 900));
-        const typingId = crypto.randomUUID();
-        setMessages((prev) => prev.concat({ id: typingId, role: "assistant", content: "typing", ts: new Date().toISOString(), typing: true, animateIn: "left" }));
-        await sleep(1600 + Math.round(Math.random() * 2200));
-        setMessages((prev) => prev.filter((x) => x.id !== typingId));
-
-        const name = storedSession.agent_name || "Conseiller";
-        const bubbles = [
-          `Bonsoir. Bienvenue chez ${agentName}.`,
-          `Je suis ${name} du service client.`,
-          "Dites-moi ce que vous cherchez et votre budget, je vous aide tout de suite.",
-        ];
-        await emitAssistantBubbles({ bubbles, baseTsIso: new Date().toISOString() });
-      } catch {
-        // ignore
-      }
-    })();
-    // Intentionally depends only on mounted/storedSession identity.
+    setMessages((prev) => {
+      if (prev.some((m) => m.transient)) return prev;
+      return [
+        ...prev,
+        {
+          id: welcomeId,
+          role: "assistant",
+          content: greeting,
+          ts: new Date().toISOString(),
+          animateIn: "left",
+          transient: true,
+        },
+      ];
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, storedSession]);
 
@@ -1422,7 +1420,7 @@ export default function ChatClient({
 	    // Always merge onto the latest disk snapshot so we never clobber messages with a stale React/ref session.
 	    const sess = loadSession(slug) ?? storedSessionRef.current;
 	    if (!sess) return;
-	    const visible = ui.filter((m) => !m.typing);
+	    const visible = ui.filter((m) => !m.typing && !m.transient);
 	    if (isConversationUiCleared(sess) && visible.length === 0) {
 	      try {
 	        saveSession(slug, { ...sess, messages: [] });
@@ -1433,7 +1431,7 @@ export default function ChatClient({
 	    }
 	    const persisted: StoredMessage[] = dedupeThreadMessages(
 	      ui
-	        .filter((m) => !m.typing)
+	        .filter((m) => !m.typing && !m.transient)
 	        .slice(-MAX_STORED_MESSAGES)
 	        .map((m) => ({
 	        id: m.id,
@@ -2049,10 +2047,8 @@ export default function ChatClient({
           agent_personality: humanAgent.personality,
           business_name: agentName,
           sales_style: humanAgent.salesStyle,
-	          history: messagesRef.current
-	            .filter((m) => !m.typing)
-	            .slice(-12)
-	            .map((m) => ({
+	          history: sanitizePayloadHistory(
+	            messagesRef.current.map((m) => ({
 	              role: m.role,
 	              content:
 	                m.kind === "image"
@@ -2060,7 +2056,12 @@ export default function ChatClient({
 	                  : m.kind === "audio"
 	                    ? `[vocal] ${m.voice_transcript || m.content || ""}`.trim()
 	                    : m.content,
+	              typing: m.typing,
+	              transient: m.transient,
+	              candidate: m.candidate,
 	            })),
+	            { maxItems: 12 },
+	          ),
 	          conversation_state: patchConversationStateForApi(
 	            storedSession?.conversation_state as Record<string, unknown> | undefined,
 	            storedSession ?? storedSessionRef.current,
@@ -2547,6 +2548,7 @@ export default function ChatClient({
 
   const clearConversationUi = () => {
     if (isClearingUi) return;
+    transientWelcomeShownRef.current = false;
     setIsClearingUi(true);
     syncSuppressUntilRef.current = Date.now() + 86_400_000;
     sendAbortRef.current?.abort();
